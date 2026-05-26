@@ -53,7 +53,7 @@ class ProfileController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // Redirect to the login page after account deletion for a consistent UX
-        return Redirect::route('login');
+        // Redirect to the root after account deletion.
+        return Redirect::to('/');
     }
 }
