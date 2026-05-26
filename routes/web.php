@@ -3,17 +3,47 @@
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\ProfileController;
+use App\Models\Item;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 Route::get('/', function () {
+    $items = [];
+
+    if (Schema::hasTable('items')) {
+        $items = Item::query()
+            ->with('category')
+            ->latest()
+            ->take(12)
+            ->get()
+            ->map(function (Item $item) {
+                $image = $item->image_path;
+
+                if (!Str::startsWith($image, ['http://', 'https://'])) {
+                    $image = Storage::url($image);
+                }
+
+                return [
+                    'id' => $item->id,
+                    'image_url' => $image,
+                    'category' => $item->category?->category_name,
+                    'description' => $item->title_description,
+                ];
+            })
+            ->all();
+    }
+
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
+        'items' => $items,
     ]);
 });
 

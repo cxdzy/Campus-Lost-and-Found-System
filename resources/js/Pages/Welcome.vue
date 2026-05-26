@@ -16,6 +16,10 @@ defineProps({
         type: String,
         required: true,
     },
+    items: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 function handleImageError() {
@@ -83,6 +87,44 @@ function handleImageError() {
                 </header>
 
                 <main class="mt-6">
+                    <section v-if="items.length" class="mb-10">
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <h2 class="text-2xl font-semibold text-black dark:text-white">
+                                    Latest Finds
+                                </h2>
+                                <p class="mt-2 text-sm text-black/70 dark:text-white/70">
+                                    Auto-submitted items from the Telegram bot.
+                                </p>
+                            </div>
+                        </div>
+                        <div
+                            class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        >
+                            <article
+                                v-for="item in items"
+                                :key="item.id"
+                                class="overflow-hidden rounded-xl bg-white shadow-[0px_14px_34px_0px_rgba(0,0,0,0.08)] ring-1 ring-white/[0.05] dark:bg-zinc-900 dark:ring-zinc-800"
+                            >
+                                <div class="aspect-[4/3] w-full bg-zinc-100 dark:bg-zinc-800">
+                                    <img
+                                        :src="item.image_url"
+                                        :alt="item.description"
+                                        class="h-full w-full object-cover"
+                                        loading="lazy"
+                                    />
+                                </div>
+                                <div class="p-4">
+                                    <div class="text-xs uppercase tracking-wide text-black/60 dark:text-white/60">
+                                        {{ item.category || 'Uncategorized' }}
+                                    </div>
+                                    <p class="mt-2 text-sm font-medium text-black dark:text-white">
+                                        {{ item.description }}
+                                    </p>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
                     <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">
                         <a
                             href="https://laravel.com/docs"

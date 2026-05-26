@@ -23,12 +23,18 @@ class BotSubmissionTest extends TestCase
             'caption' => 'Found near the library',
         ];
 
-        $this->postJson('/api/bot/submit', $payload)
+        $response = $this->postJson('/api/bot/submit', $payload)
             ->assertOk()
             ->assertJson([
-                'category' => 'electronics',
-                'confidence' => 0.95,
-                'description' => 'A black smartphone',
+                'message' => 'Bot submission saved',
+                'analysis' => [
+                    'category' => 'electronics',
+                    'confidence' => 0.95,
+                    'description' => 'A black smartphone',
+                ],
             ]);
+
+        $this->assertDatabaseCount('items', 1);
+        $this->assertNotNull($response->json('id'));
     }
 }
