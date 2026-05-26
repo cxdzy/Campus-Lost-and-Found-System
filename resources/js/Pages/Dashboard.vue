@@ -4,6 +4,13 @@ import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
 
+const props = defineProps({
+    items: {
+        type: Array,
+        default: () => [],
+    },
+});
+
 const activeTab = ref('gallery');
 const activeCategory = ref('All');
 const searchQuery = ref('');
@@ -277,6 +284,9 @@ const simulateMapPin = () => {
 };
 
 onMounted(() => {
+    if (props.items.length) {
+        galleryItems.value = props.items.map(mapItemToCard);
+    }
     fetchCategories();
     fetchGalleryItems();
 });

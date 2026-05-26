@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ItemController extends Controller
 {
@@ -45,7 +46,7 @@ class ItemController extends Controller
         $page = $query->orderByDesc('id')->paginate($perPage);
         // Ensure frontend receives a publicly accessible URL when available.
         $page->getCollection()->transform(function ($item) {
-            $item->image_url = $item->image_path ? Storage::url($item->image_path) : null;
+            $item->image_url = $this->resolveImageUrl($item->image_path);
             return $item;
         });
 
@@ -88,7 +89,7 @@ class ItemController extends Controller
         $item = Item::create($data);
 
         $item = $item->load(['category', 'aiTags', 'user']);
-        $item->image_url = $item->image_path ? Storage::url($item->image_path) : null;
+        $item->image_url = $this->resolveImageUrl($item->image_path);
 
         return response()->json([
             'data' => $item,
@@ -98,7 +99,7 @@ class ItemController extends Controller
     public function show(Item $item): JsonResponse
     {
         $item = $item->load(['category', 'aiTags', 'user']);
-        $item->image_url = $item->image_path ? Storage::url($item->image_path) : null;
+        $item->image_url = $this->resolveImageUrl($item->image_path);
 
         return response()->json([
             'data' => $item,
@@ -123,7 +124,7 @@ class ItemController extends Controller
         $item->save();
 
         $item = $item->load(['category', 'aiTags', 'user']);
-        $item->image_url = $item->image_path ? Storage::url($item->image_path) : null;
+        $item->image_url = $this->resolveImageUrl($item->image_path);
 
         return response()->json([
             'data' => $item,
@@ -135,5 +136,18 @@ class ItemController extends Controller
         $item->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function resolveImageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+
+        return Storage::url($path);
     }
 }

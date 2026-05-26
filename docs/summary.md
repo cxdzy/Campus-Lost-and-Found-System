@@ -6,6 +6,7 @@
 - Added admin API endpoints for users and reports under `/admin/api/*`.
 - Added bot submission API: `POST /api/bot/submit` returns dummy Vision AI analysis (no external API keys).
 - Ensured `/api/bot/submit` is public (no auth), per the Node.js bot integration.
+- Bot submissions now persist to the `items` table with defaults and return a success message + record ID.
 
 ## Admin Area
 - Added admin controllers, middleware, routes, layouts, and pages.
@@ -31,6 +32,7 @@
 ## Frontend & Build
 - Fixed Vite manifest issues by using a single entry (`resources/js/app.js`).
 - Rebuilt assets and verified admin pages load correctly.
+- Public homepage now renders the latest items in a responsive grid.
 
 ## Tests
 - Added bot submission feature tests.

@@ -48,7 +48,38 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    $items = [];
+
+    if (Schema::hasTable('items')) {
+        $items = Item::query()
+            ->with('category')
+            ->where('type', 'Found')
+            ->latest()
+            ->take(20)
+            ->get()
+            ->map(function (Item $item) {
+                $image = $item->image_path;
+
+                if (!Str::startsWith($image, ['http://', 'https://'])) {
+                    $image = Storage::url($image);
+                }
+
+                return [
+                    'id' => $item->id,
+                    'title_description' => $item->title_description,
+                    'category' => $item->category,
+                    'location_name' => $item->location_name,
+                    'created_at' => $item->created_at,
+                    'image_url' => $image,
+                    'image_path' => $item->image_path,
+                ];
+            })
+            ->all();
+    }
+
+    return Inertia::render('Dashboard', [
+        'items' => $items,
+    ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
