@@ -214,16 +214,30 @@ const otpLoading = ref(false);
 
 const asset = (p) => new URL(p, import.meta.url).href;
 
-const inventory = ref([
-    { id: '1001', title: 'Black Leather Wallet', category: 'Wallets', location: 'Cafeteria A', coords: '3.0697, 101.5037', status: 'Matched', image: asset('./assets/blackwallet.jpg'), confidence: 94.2, tags: ['WALLET', 'LEATHER', 'BLACK', 'ITEM'] },
-    { id: '1002', title: 'Blue HydroFlask', category: 'Accessories', location: 'Gymnasium', coords: '3.0721, 101.5012', status: 'Pending', image: asset('./assets/bluehydroflask.jpg'), confidence: 88.5, tags: ['BOTTLE', 'METAL', 'BLUE', 'FLASK'] },
-    { id: '1003', title: 'Honda Keys (Red Tag)', category: 'Keys', location: 'Block B Carpark', coords: '3.0685, 101.5055', status: 'Matched', image: asset('./assets/hondakeysredtag.jpg'), confidence: 97.1, tags: ['KEYS', 'HONDA', 'METAL', 'RED'] },
-    { id: '1004', title: 'MacBook Pro Charger', category: 'Electronics', location: 'Library Level 3', coords: '3.0700, 101.5040', status: 'Claimed', image: asset('./assets/macbookprocharger.jpg'), confidence: 92.4, tags: ['CHARGER', 'ELECTRONICS', 'WHITE', 'APPLE'] },
-    { id: '1005', title: 'Matric Card (Ahmad)', category: 'IDs', location: 'Main Gate', coords: '3.0750, 101.5080', status: 'Pending', image: asset('./assets/matrixcard.jpg'), confidence: 98.9, tags: ['CARD', 'STUDENT_ID', 'WHITE', 'PHOTO'] },
-    { id: '1006', title: 'Nike Sports Bag', category: 'Bags & Backpacks', location: 'Stadium', coords: '3.0780, 101.5020', status: 'Pending', image: asset('./assets/nikesportbag.jpg'), confidence: 85.3, tags: ['BAG', 'NIKE', 'BLACK', 'CLOTH'] },
-    { id: '1007', title: 'Reading Glasses', category: 'Accessories', location: 'Library Level 1', coords: '3.0701, 101.5042', status: 'Pending', image: asset('./assets/Reading%20Glasses.jpg'), confidence: 91.0, tags: ['GLASSES', 'EYEWEAR', 'PLASTIC', 'BLACK'] },
-    { id: '1008', title: 'Scientific Calculator', category: 'Electronics', location: 'Lecture Hall 4', coords: '3.0655, 101.5030', status: 'Claimed', image: asset('./assets/scientificcalculatorjpg.jpg'), confidence: 95.6, tags: ['CALCULATOR', 'ELECTRONICS', 'CASIO', 'GRAY'] }
-]);
+const inventory = ref([]);
+
+const normalizeImagePath = (path) => {
+    if (!path) return asset('./assets/placeholder.png');
+    if (typeof path !== 'string') return asset('./assets/placeholder.png');
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path.startsWith('/')) return window.location.origin + path;
+    return window.location.origin + `/storage/${path}`;
+};
+
+const mapReportToInventory = (r) => {
+    const item = r; // API returns report fields similar to Item model
+    return {
+        id: item.id,
+        title: item.title_description ?? item.title ?? 'Untitled',
+        category: (item.category && (typeof item.category === 'string' ? item.category : item.category?.category_name)) ?? 'Uncategorized',
+        location: item.location_name ?? 'Unknown location',
+        coords: (item.latitude && item.longitude) ? `${item.latitude}, ${item.longitude}` : (item.coords ?? ''),
+        status: item.status ?? 'Pending',
+        image: normalizeImagePath(item.image_url ?? item.image_path ?? ''),
+        confidence: item.confidence ?? item.ai_confidence ?? 0,
+        tags: Array.isArray(item.aiTags) ? item.aiTags.map(t => t.tag ?? t.name ?? String(t)) : (item.tags ?? []),
+    };
+};
 
 const matchAlerts = ref([
     { 
@@ -263,6 +277,16 @@ const onAdminTab = (e) => {
 
 onMounted(() => {
     window.addEventListener('admin-tab', onAdminTab);
+    // Load real inventory from admin API so the dashboard shows actual uploaded images
+    (async () => {
+        try {
+            const res = await window.axios.get('/admin/api/reports');
+            const items = res.data?.data ?? [];
+            inventory.value = items.map(mapReportToInventory);
+        } catch (e) {
+            console.error('Failed to load admin inventory', e);
+        }
+    })();
 });
 
 onUnmounted(() => {
