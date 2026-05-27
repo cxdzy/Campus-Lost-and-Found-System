@@ -139,4 +139,33 @@ class ItemApiTest extends TestCase
             'status' => 'Matched',
         ]);
     }
+
+    public function test_authenticated_user_can_delete_own_item(): void
+    {
+        $user = User::factory()->create();
+        $category = Category::create([
+            'category_name' => 'Electronics',
+            'icon_identifier' => 'electronics',
+        ]);
+
+        $item = Item::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'type' => 'Lost',
+            'title_description' => 'Blue notebook',
+            'latitude' => 3.0712,
+            'longitude' => 101.4984,
+            'location_name' => 'Library',
+            'image_path' => url('/images/placeholder-item.svg'),
+            'status' => 'Pending',
+        ]);
+
+        $this->actingAs($user)
+            ->deleteJson('/dashboard/data/items/'.$item->id)
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('items', [
+            'id' => $item->id,
+        ]);
+    }
 }

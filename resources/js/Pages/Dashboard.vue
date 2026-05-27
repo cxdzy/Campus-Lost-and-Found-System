@@ -18,6 +18,8 @@ const props = defineProps({
 const activeTab = ref('gallery');
 const activeCategory = ref('All');
 const searchQuery = ref('');
+const isReportModalOpen = ref(false);
+const selectedReport = ref(null);
 const isSubmitting = ref(false);
 const showSuccess = ref(false);
 const isSavingSettings = ref(false);
@@ -53,6 +55,7 @@ const reportForm = ref({
 const isFoundReport = computed(() => reportForm.value.type === 'Found');
 
 const galleryItems = ref([]);
+const myReports = ref([]);
 
 const filteredItems = computed(() => {
     return galleryItems.value.filter((item) => {
@@ -134,7 +137,32 @@ const mapReportToCard = (item) => ({
     image: normalizeImagePath(item.image_url ?? item.image_path),
 });
 
-const reportItems = computed(() => props.myReports.map(mapReportToCard));
+const reportItems = computed(() => myReports.value.map(mapReportToCard));
+
+const openReportModal = (item) => {
+    selectedReport.value = item;
+    isReportModalOpen.value = true;
+};
+
+const closeReportModal = () => {
+    isReportModalOpen.value = false;
+    selectedReport.value = null;
+};
+
+const deleteSelectedReport = async () => {
+    if (!selectedReport.value) return;
+
+    const reportId = selectedReport.value.id;
+
+    try {
+        await window.axios.delete(`/dashboard/data/items/${reportId}`);
+        myReports.value = myReports.value.filter((item) => item.id !== reportId);
+        closeReportModal();
+    } catch (error) {
+        console.error('Failed to delete report', error);
+        reportError.value = 'Unable to delete this report right now. Please try again.';
+    }
+};
 
 const fetchCategories = async () => {
     categoryError.value = '';
@@ -308,6 +336,7 @@ onMounted(() => {
     if (props.items.length) {
         galleryItems.value = props.items.map(mapItemToCard);
     }
+    myReports.value = props.myReports;
     fetchCategories();
     fetchGalleryItems();
 });
@@ -587,13 +616,68 @@ onMounted(() => {
                                             <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                             {{ item.location }}
                                         </div>
-                                        <button class="bg-white border border-indigo-200 text-indigo-700 font-bold py-2 px-6 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm whitespace-nowrap">
+                                        <button @click="openReportModal(item)" class="bg-white border border-indigo-200 text-indigo-700 font-bold py-2 px-6 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm whitespace-nowrap">
                                             View Report
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        <transition name="fade">
+                            <div v-if="isReportModalOpen && selectedReport" class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+                                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeReportModal"></div>
+
+                                <div class="relative z-10 w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden border border-gray-200">
+                                    <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
+                                        <div>
+                                            <p class="text-xs font-bold uppercase tracking-widest text-indigo-500">Report Details</p>
+                                            <h3 class="text-2xl font-bold text-gray-900 mt-1 truncate">{{ selectedReport.title }}</h3>
+                                        </div>
+                                        <button @click="closeReportModal" class="rounded-full p-2 text-gray-400 hover:text-gray-900 hover:bg-white border border-gray-200 transition-colors">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="p-6 grid gap-6 md:grid-cols-[220px_1fr]">
+                                        <div class="rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 shadow-sm h-56 md:h-full min-h-[220px]">
+                                            <img :src="selectedReport.image" :alt="selectedReport.title" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/400x300?text=Report';">
+                                        </div>
+
+                                        <div class="space-y-5">
+                                            <div>
+                                                <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Description</p>
+                                                <p class="mt-2 text-base text-gray-900 leading-7">{{ selectedReport.title }}</p>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div class="rounded-2xl bg-gray-50 border border-gray-200 p-4">
+                                                    <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Category</p>
+                                                    <p class="mt-2 text-sm font-semibold text-gray-900">{{ selectedReport.category }}</p>
+                                                </div>
+                                                <div class="rounded-2xl bg-gray-50 border border-gray-200 p-4">
+                                                    <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Location</p>
+                                                    <p class="mt-2 text-sm font-semibold text-gray-900">{{ selectedReport.location }}</p>
+                                                </div>
+                                                <div class="rounded-2xl bg-gray-50 border border-gray-200 p-4 sm:col-span-2">
+                                                    <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Timestamp</p>
+                                                    <p class="mt-2 text-sm font-semibold text-gray-900">{{ selectedReport.timeAgo }}</p>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex flex-col sm:flex-row gap-3 sm:justify-end pt-2">
+                                                <button @click="closeReportModal" class="px-5 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors">
+                                                    Close
+                                                </button>
+                                                <button @click="deleteSelectedReport" class="px-5 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors shadow-sm">
+                                                    Delete Report
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </transition>
                     </div>
 
                     <div v-else-if="activeTab === 'settings'" class="max-w-3xl mx-auto space-y-6">

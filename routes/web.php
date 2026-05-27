@@ -120,6 +120,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/categories', [CategoryController::class, 'index']);
         Route::get('/items', [ItemController::class, 'index']);
         Route::post('/items', [ItemController::class, 'store']);
+        Route::delete('/items/{item}', [ItemController::class, 'destroy']);
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
