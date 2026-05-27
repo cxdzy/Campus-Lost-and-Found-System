@@ -67,7 +67,8 @@ Route::get('/dashboard', function () {
                 return [
                     'id' => $item->id,
                     'title_description' => $item->title_description,
-                    'category' => $item->category,
+                    // Normalize category to a simple string so frontend filtering works consistently
+                    'category' => $item->category?->category_name,
                     'location_name' => $item->location_name,
                     'created_at' => $item->created_at,
                     'image_url' => $image,

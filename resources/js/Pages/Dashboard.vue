@@ -105,15 +105,20 @@ const formatTimeAgo = (value) => {
     return 'just now';
 };
 
-const mapItemToCard = (item) => ({
-    id: item.id,
-    title: item.title_description,
-    category: item.category?.category_name ?? 'Uncategorized',
-    location: item.location_name ?? 'Unknown location',
-    timeAgo: formatTimeAgo(item.created_at),
-    // Prefer explicit image_url returned by backend; fallback to image_path
-    image: normalizeImagePath(item.image_url ?? item.image_path),
-});
+const mapItemToCard = (item) => {
+    const rawCategory = item.category;
+    const categoryName = typeof rawCategory === 'string' ? rawCategory : (rawCategory?.category_name ?? 'Uncategorized');
+
+    return {
+        id: item.id,
+        title: item.title_description,
+        category: categoryName,
+        location: item.location_name ?? 'Unknown location',
+        timeAgo: formatTimeAgo(item.created_at),
+        // Prefer explicit image_url returned by backend; fallback to image_path
+        image: normalizeImagePath(item.image_url ?? item.image_path),
+    };
+};
 
 const fetchCategories = async () => {
     categoryError.value = '';
