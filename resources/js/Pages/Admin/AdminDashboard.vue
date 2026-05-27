@@ -34,7 +34,7 @@
                               <td class="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-slate-500">#{{ item.id }}</td>
                               <td class="px-6 py-4 whitespace-nowrap">
                                   <div class="w-16 h-12 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 shadow-inner">
-                                      <img :src="item.image" class="w-full h-full object-cover group-hover:scale-110 transition-all">
+                                      <img :src="item.image" @error="handleImageError" class="w-full h-full object-cover group-hover:scale-110 transition-all">
                                   </div>
                               </td>
                               <td class="px-6 py-4 whitespace-nowrap">
@@ -149,7 +149,7 @@
                   <div class="space-y-3">
                       <label class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Raw Image Asset (VPS Hosted)</label>
                       <div class="w-full h-72 bg-slate-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200">
-                          <img :src="selectedItem.image" class="w-full h-full object-cover">
+                          <img :src="selectedItem.image" @error="handleImageError" class="w-full h-full object-cover">
                       </div>
                   </div>
 
@@ -213,15 +213,24 @@ const selectedItem = ref(null);
 const otpLoading = ref(false);
 
 const asset = (p) => new URL(p, import.meta.url).href;
+const fallbackImage =
+    'data:image/svg+xml;charset=UTF-8,' +
+    encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><rect width="800" height="600" fill="#e2e8f0"/><rect x="120" y="110" width="560" height="360" rx="28" fill="#cbd5e1"/><circle cx="320" cy="250" r="44" fill="#94a3b8"/><path d="M160 430l120-120 90 90 70-70 160 160H160z" fill="#94a3b8"/><text x="400" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" fill="#64748b">Image unavailable</text></svg>`
+    );
 
 const inventory = ref([]);
 
 const normalizeImagePath = (path) => {
-    if (!path) return asset('./assets/placeholder.png');
-    if (typeof path !== 'string') return asset('./assets/placeholder.png');
+    if (!path) return fallbackImage;
+    if (typeof path !== 'string') return fallbackImage;
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     if (path.startsWith('/')) return window.location.origin + path;
     return window.location.origin + `/storage/${path}`;
+};
+
+const handleImageError = (event) => {
+    event.target.src = fallbackImage;
 };
 
 const mapReportToInventory = (r) => {
@@ -280,9 +289,15 @@ onMounted(() => {
     // Load real inventory from admin API so the dashboard shows actual uploaded images
     (async () => {
         try {
-            const res = await window.axios.get('/admin/api/reports');
+            const res = await window.axios.get('/admin/api/reports', {
+                params: {
+                    type: 'Found',
+                },
+            });
             const items = res.data?.data ?? [];
-            inventory.value = items.map(mapReportToInventory);
+            inventory.value = items
+                .filter((item) => item.type === 'Found')
+                .map(mapReportToInventory);
         } catch (e) {
             console.error('Failed to load admin inventory', e);
         }
