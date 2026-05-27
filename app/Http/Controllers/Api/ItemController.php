@@ -82,6 +82,8 @@ class ItemController extends Controller
         if ($request->hasFile('image_file')) {
             $path = $request->file('image_file')->store('lost_placeholders', 'public');
             $data['image_path'] = $path;
+        } elseif (empty($data['image_path'])) {
+            $data['image_path'] = url('/images/placeholder-item.svg');
         }
 
         $data['status'] = $data['status'] ?? 'Pending';

@@ -76,6 +76,37 @@ class ItemApiTest extends TestCase
         ]);
     }
 
+    public function test_authenticated_user_can_create_lost_item_without_image(): void
+    {
+        $user = User::factory()->create();
+        $category = Category::create([
+            'category_name' => 'Electronics',
+            'icon_identifier' => 'electronics',
+        ]);
+
+        $payload = [
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'type' => 'Lost',
+            'title_description' => 'Blue notebook',
+            'latitude' => 3.0712,
+            'longitude' => 101.4984,
+            'location_name' => 'Library',
+        ];
+
+        $this->actingAs($user)
+            ->postJson('/api/items', $payload)
+            ->assertStatus(201)
+            ->assertJsonPath('data.image_path', url('/images/placeholder-item.svg'));
+
+        $this->assertDatabaseHas('items', [
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'title_description' => 'Blue notebook',
+            'image_path' => url('/images/placeholder-item.svg'),
+        ]);
+    }
+
     public function test_authenticated_user_can_update_item(): void
     {
         $user = User::factory()->create();
