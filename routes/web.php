@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\ProfileController;
 use App\Models\Item;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -47,8 +48,10 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/dashboard', function () {
+Route::get('/dashboard', function (Request $request) {
     $items = [];
+    $myReports = [];
+    $user = $request->user();
 
     if (Schema::hasTable('items')) {
         $items = Item::query()
@@ -76,10 +79,39 @@ Route::get('/dashboard', function () {
                 ];
             })
             ->all();
+
+        if ($user) {
+            $myReports = $user->items()
+                ->with('category')
+                ->where('type', 'Lost')
+                ->latest()
+                ->take(20)
+                ->get()
+                ->map(function (Item $item) {
+                    $image = $item->image_path;
+
+                    if (!Str::startsWith($image, ['http://', 'https://'])) {
+                        $image = Storage::url($image);
+                    }
+
+                    return [
+                        'id' => $item->id,
+                        'title_description' => $item->title_description,
+                        'category' => $item->category?->category_name,
+                        'location_name' => $item->location_name,
+                        'created_at' => $item->created_at,
+                        'status' => $item->status,
+                        'image_url' => $image,
+                        'image_path' => $item->image_path,
+                    ];
+                })
+                ->all();
+        }
     }
 
     return Inertia::render('Dashboard', [
         'items' => $items,
+        'myReports' => $myReports,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 

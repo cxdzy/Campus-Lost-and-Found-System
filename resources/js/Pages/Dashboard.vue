@@ -9,6 +9,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    myReports: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const activeTab = ref('gallery');
@@ -119,6 +123,18 @@ const mapItemToCard = (item) => {
         image: normalizeImagePath(item.image_url ?? item.image_path),
     };
 };
+
+const mapReportToCard = (item) => ({
+    id: item.id,
+    title: item.title_description,
+    category: typeof item.category === 'string' ? item.category : (item.category?.category_name ?? 'Uncategorized'),
+    location: item.location_name ?? 'Unknown location',
+    status: item.status ?? 'Pending',
+    timeAgo: formatTimeAgo(item.created_at),
+    image: normalizeImagePath(item.image_url ?? item.image_path),
+});
+
+const reportItems = computed(() => props.myReports.map(mapReportToCard));
 
 const fetchCategories = async () => {
     categoryError.value = '';
@@ -538,49 +554,43 @@ onMounted(() => {
                         </transition>
 
                         <div class="space-y-6">
-                            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 shadow-md relative overflow-hidden flex flex-col sm:flex-row gap-6">
-                                <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-bl-full -z-10"></div>
+                            <div v-if="reportItems.length === 0" class="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
+                                <div class="mx-auto w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+                                    <svg class="w-7 h-7 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                </div>
+                                <h3 class="text-lg font-bold text-gray-900">You have not reported any lost items yet</h3>
+                                <p class="mt-2 text-sm text-gray-500">Once you submit a lost report, it will appear here with its current status and alerts.</p>
+                            </div>
 
-                                <div class="w-full sm:w-48 h-32 bg-white rounded-xl border border-indigo-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                     <img src="/images/bluehydroflask.jpg" alt="Blue Hydroflask" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/200x150?text=Match';">
+                            <div v-for="item in reportItems" :key="item.id" :class="['rounded-2xl p-6 shadow-md relative overflow-hidden flex flex-col sm:flex-row gap-6 border', item.status === 'Matched' ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200']">
+                                <div v-if="item.status === 'Matched'" class="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-bl-full -z-10"></div>
+
+                                <div class="w-full sm:w-48 h-32 bg-white rounded-xl border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                    <img :src="item.image" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/200x150?text=Report';">
                                 </div>
 
                                 <div class="flex-1 flex flex-col justify-between">
                                     <div>
-                                        <div class="flex justify-between items-start">
-                                            <span class="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide flex items-center mb-2 inline-flex">
+                                        <div class="flex justify-between items-start gap-3">
+                                            <span :class="['text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide flex items-center mb-2 inline-flex', item.status === 'Matched' ? 'bg-indigo-600' : item.status === 'Claimed' ? 'bg-emerald-600' : 'bg-blue-600']">
                                                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                                High Confidence Match
+                                                {{ item.status }}
                                             </span>
+                                            <span class="text-xs text-gray-400 font-medium">Reported {{ item.timeAgo }}</span>
                                         </div>
-                                        <h3 class="text-xl font-bold text-indigo-900">Blue HydroFlask Bottle</h3>
-                                        <p class="text-sm text-indigo-700 mt-1">Our AI calculated an 85% match based on your report "Blue Metal Water Bottle".</p>
+                                        <h3 :class="['text-xl font-bold', item.status === 'Matched' ? 'text-indigo-900' : 'text-gray-900']">{{ item.title }}</h3>
+                                        <p :class="['text-sm mt-1', item.status === 'Matched' ? 'text-indigo-700' : 'text-gray-600']">{{ item.category }} · {{ item.location }}</p>
                                     </div>
 
                                     <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                         <div class="text-sm font-medium text-gray-700 flex items-center">
                                             <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                            Found at: Main Cafeteria Security Post
+                                            {{ item.location }}
                                         </div>
                                         <button class="bg-white border border-indigo-200 text-indigo-700 font-bold py-2 px-6 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm whitespace-nowrap">
-                                            Generate Claim OTP
+                                            View Report
                                         </button>
                                     </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 hover:shadow-md transition-shadow">
-                                <div>
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded uppercase tracking-wide">Searching</span>
-                                        <span class="text-sm text-gray-500">Reported Oct 12, 2026</span>
-                                    </div>
-                                    <h3 class="text-lg font-bold text-gray-900">Black Honda Car Keys</h3>
-                                    <p class="text-sm text-gray-600 mt-1">Lost near Main Library, Level 2</p>
-                                </div>
-                                <div class="flex items-center text-sm text-indigo-600 font-medium bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 w-full sm:w-auto justify-center">
-                                    <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                    AI Scanning 42 items...
                                 </div>
                             </div>
                         </div>
