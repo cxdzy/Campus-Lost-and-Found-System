@@ -150,6 +150,6 @@ class ItemController extends Controller
             return $path;
         }
 
-        return Storage::url($path);
+        return Storage::disk('public')->exists($path) ? '/storage/' . $path : null;
     }
 }

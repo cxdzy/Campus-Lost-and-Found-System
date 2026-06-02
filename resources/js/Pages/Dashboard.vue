@@ -631,7 +631,7 @@ const pageTitle = computed(() => {
                                 <div v-if="item.status === 'Matched'" class="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-bl-full -z-10"></div>
 
                                 <div class="w-full sm:w-48 h-32 bg-white rounded-xl border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                    <img :src="item.image" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/200x150?text=Report';">
+                                    <img :src="item.image" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='/images/placeholder-item.svg';">
                                 </div>
 
                                 <div class="flex-1 flex flex-col justify-between">
@@ -677,7 +677,7 @@ const pageTitle = computed(() => {
 
                                     <div class="p-6 grid gap-6 md:grid-cols-[220px_1fr]">
                                         <div class="rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 shadow-sm h-56 md:h-full min-h-[220px]">
-                                            <img :src="selectedReport.image" :alt="selectedReport.title" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/400x300?text=Report';">
+                                            <img :src="selectedReport.image" :alt="selectedReport.title" class="w-full h-full object-cover" onerror="this.src='/images/placeholder-item.svg';">
                                         </div>
 
                                         <div class="space-y-5">

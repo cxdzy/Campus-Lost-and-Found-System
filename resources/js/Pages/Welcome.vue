@@ -108,10 +108,11 @@ function handleImageError() {
                             >
                                 <div class="aspect-[4/3] w-full bg-zinc-100 dark:bg-zinc-800">
                                     <img
-                                        :src="item.image_url"
+                                        :src="item.image_url ?? '/images/placeholder-item.svg'"
                                         :alt="item.description"
                                         class="h-full w-full object-cover"
                                         loading="lazy"
+                                        @error="$event.target.src = '/images/placeholder-item.svg'"
                                     />
                                 </div>
                                 <div class="p-4">

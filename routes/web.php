@@ -25,8 +25,10 @@ Route::get('/', function () {
             ->map(function (Item $item) {
                 $image = $item->image_path;
 
-                if (!Str::startsWith($image, ['http://', 'https://'])) {
-                    $image = Storage::url($image);
+                if (!$image) {
+                    $image = null;
+                } elseif (!Str::startsWith($image, ['http://', 'https://'])) {
+                    $image = Storage::disk('public')->exists($image) ? '/storage/' . $image : null;
                 }
 
                 return [
@@ -63,8 +65,10 @@ Route::get('/dashboard', function (Request $request) {
             ->map(function (Item $item) {
                 $image = $item->image_path;
 
-                if (!Str::startsWith($image, ['http://', 'https://'])) {
-                    $image = Storage::url($image);
+                if (!$image) {
+                    $image = null;
+                } elseif (!Str::startsWith($image, ['http://', 'https://'])) {
+                    $image = Storage::disk('public')->exists($image) ? '/storage/' . $image : null;
                 }
 
                 return [
@@ -90,8 +94,10 @@ Route::get('/dashboard', function (Request $request) {
                 ->map(function (Item $item) {
                     $image = $item->image_path;
 
-                    if (!Str::startsWith($image, ['http://', 'https://'])) {
-                        $image = Storage::url($image);
+                    if (!$image) {
+                        $image = null;
+                    } elseif (!Str::startsWith($image, ['http://', 'https://'])) {
+                        $image = Storage::disk('public')->exists($image) ? '/storage/' . $image : null;
                     }
 
                     return [
