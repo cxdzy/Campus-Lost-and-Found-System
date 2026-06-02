@@ -6,73 +6,53 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\User;
-use App\Services\VisionAiService;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class BotSubmissionController extends Controller
 {
-    public function store(Request $request, VisionAiService $vision): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'image_url' => ['required', 'url'],
-            'caption'   => ['required', 'string'],
+            'caption'   => ['nullable', 'string', 'max:500'],
         ]);
 
-        // Download the image once — reused for both Gemini analysis and local storage.
-        $imageBody = null;
-        $mimeType  = 'image/jpeg';
-        $imagePath = $validated['image_url']; // fallback: keep remote URL
+        // Download the image from the Telegram URL and save locally so we never
+        // hotlink to Telegram's CDN (avoids ERR_BLOCKED_BY_ORB and hides the bot token).
+        $download = Http::timeout(15)->get($validated['image_url']);
 
-        try {
-            $download = Http::timeout(15)->get($validated['image_url']);
-
-            if ($download->successful() && $download->body()) {
-                $imageBody = $download->body();
-                $mimeType  = $this->resolveMime($download->header('Content-Type'), $imageBody);
-
-                // Persist to local public storage
-                $ext      = $this->mimeToExt($mimeType);
-                $filename = 'telegram_' . Str::random(12) . '.' . $ext;
-                if (Storage::disk('public')->put('found_items/' . $filename, $imageBody)) {
-                    $imagePath = 'found_items/' . $filename;
-                }
-            }
-        } catch (\Throwable $e) {
-            // Image download failed; continue without local copy.
+        if (!$download->successful() || !$download->body()) {
+            return response()->json(['message' => 'Could not download image from provided URL.'], 422);
         }
 
-        // Run Gemini vision analysis on the downloaded body (or fall back to dummy).
-        $analysis = $imageBody
-            ? $vision->analyzeImage($imageBody, $mimeType)
-            : ['category' => 'Other', 'confidence' => 0.5, 'description' => 'Found item'];
+        $imageContent = $download->body();
+        $ext          = $this->detectExtension($download->header('Content-Type'), $imageContent);
+        $filename     = Str::uuid() . '.' . $ext;
 
-        // Resolve category row — match by name, fall back to first, or create Electronics.
-        $categoryName = strtolower($analysis['category'] ?? 'other');
-        $category = Category::query()->whereRaw('LOWER(category_name) = ?', [$categoryName])->first()
+        Storage::disk('public')->put('items/' . $filename, $imageContent);
+
+        // Store only the relative path — the backend converts it to a full URL on read.
+        $imagePath = 'items/' . $filename;
+
+        $title = trim($validated['caption'] ?? '') ?: 'Item reported via Telegram';
+
+        $category = Category::query()->where('category_name', 'Others')->first()
             ?? Category::query()->first()
             ?? Category::query()->firstOrCreate(
-                ['category_name' => 'Electronics'],
-                ['icon_identifier' => 'electronics']
+                ['category_name' => 'Others'],
+                ['icon_identifier' => 'others']
             );
 
-        // Resolve bot user row.
         $user = User::query()->where('matric_number', 'ADMIN-001')->first()
-            ?? User::query()->firstOrCreate(
-                ['matric_number' => 'BOT-000'],
-                [
-                    'name'             => 'Telegram Bot',
-                    'role'             => 'Admin',
-                    'telegram_chat_id' => null,
-                    'password'         => bcrypt('bot-password'),
-                ]
-            );
+            ?? User::query()->where('role', 'Admin')->first();
 
-        $rawTitle = trim(($analysis['description'] ?? '') . ' - ' . $validated['caption']);
-        $title    = ($rawTitle === '-' || $rawTitle === '') ? $validated['caption'] : $rawTitle;
+        if (!$user) {
+            return response()->json(['message' => 'No admin user found to assign submission to.'], 500);
+        }
 
         $item = Item::create([
             'user_id'           => $user->id,
@@ -86,37 +66,22 @@ class BotSubmissionController extends Controller
             'status'            => 'Pending',
         ]);
 
-        return response()->json([
-            'message'  => 'Bot submission saved',
-            'id'       => $item->id,
-            'analysis' => $analysis,
-        ]);
+        return response()->json(['message' => 'Item saved successfully', 'id' => $item->id]);
     }
 
-    private function resolveMime(?string $contentType, string $body): string
+    private function detectExtension(?string $contentType, string $body): string
     {
         if ($contentType) {
-            if (Str::contains($contentType, 'jpeg') || Str::contains($contentType, 'jpg')) return 'image/jpeg';
-            if (Str::contains($contentType, 'png'))  return 'image/png';
-            if (Str::contains($contentType, 'gif'))  return 'image/gif';
-            if (Str::contains($contentType, 'webp')) return 'image/webp';
+            if (Str::contains($contentType, ['jpeg', 'jpg'])) return 'jpg';
+            if (Str::contains($contentType, 'png'))           return 'png';
+            if (Str::contains($contentType, 'gif'))           return 'gif';
+            if (Str::contains($contentType, 'webp'))          return 'webp';
         }
-        // Magic bytes fallback
         $h = substr($body, 0, 12);
-        if (substr($h, 0, 3) === "\xFF\xD8\xFF")                                     return 'image/jpeg';
-        if (substr($h, 0, 8) === "\x89PNG\r\n\x1A\n")                                return 'image/png';
-        if (substr($h, 0, 3) === 'GIF')                                               return 'image/gif';
-        if (substr($h, 0, 4) === 'RIFF' && substr($h, 8, 4) === 'WEBP')              return 'image/webp';
-        return 'image/jpeg';
-    }
-
-    private function mimeToExt(string $mime): string
-    {
-        return match ($mime) {
-            'image/png'  => 'png',
-            'image/gif'  => 'gif',
-            'image/webp' => 'webp',
-            default      => 'jpg',
-        };
+        if (substr($h, 0, 3) === "\xFF\xD8\xFF")                        return 'jpg';
+        if (substr($h, 0, 8) === "\x89PNG\r\n\x1A\n")                   return 'png';
+        if (substr($h, 0, 3) === 'GIF')                                  return 'gif';
+        if (substr($h, 0, 4) === 'RIFF' && substr($h, 8, 4) === 'WEBP') return 'webp';
+        return 'jpg';
     }
 }
