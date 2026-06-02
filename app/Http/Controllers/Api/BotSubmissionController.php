@@ -7,6 +7,9 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\User;
 use App\Services\VisionAiService;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -53,6 +56,30 @@ class BotSubmissionController extends Controller
 
         $title = trim(($analysis['description'] ?? '') . ' - ' . $validated['caption']);
 
+        // Attempt to download the remote image into local storage for reliable serving.
+        $imagePath = $validated['image_url'];
+
+        try {
+            $response = Http::timeout(10)->get($validated['image_url']);
+            if ($response->successful() && $response->body()) {
+                $ext = null;
+                $contentType = $response->header('Content-Type');
+                if ($contentType) {
+                    if (Str::contains($contentType, 'jpeg')) $ext = 'jpg';
+                    elseif (Str::contains($contentType, 'png')) $ext = 'png';
+                    elseif (Str::contains($contentType, 'gif')) $ext = 'gif';
+                }
+
+                $filename = 'telegram_' . Str::random(12) . ($ext ? '.' . $ext : '');
+                $stored = Storage::disk('public')->put('found_items/' . $filename, $response->body());
+                if ($stored) {
+                    $imagePath = 'found_items/' . $filename;
+                }
+            }
+        } catch (\Throwable $e) {
+            // If download fails, fall back to using remote URL as-is.
+        }
+
         $item = Item::create([
             'user_id' => $user->id,
             'category_id' => $category->id,
@@ -61,7 +88,7 @@ class BotSubmissionController extends Controller
             'latitude' => 0.0,
             'longitude' => 0.0,
             'location_name' => 'Telegram Bot',
-            'image_path' => $validated['image_url'],
+            'image_path' => $imagePath,
             'status' => 'Pending',
         ]);
 
