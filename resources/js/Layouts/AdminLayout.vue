@@ -26,7 +26,11 @@
       </aside>
 
             <main class="flex-1 flex flex-col h-screen overflow-hidden">
-                <slot />
+                <div class="flex-1 overflow-auto">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-4 bg-white rounded-t-2xl shadow-sm">
+                        <slot />
+                    </div>
+                </div>
             </main>
         <ToastStack />
     </div>

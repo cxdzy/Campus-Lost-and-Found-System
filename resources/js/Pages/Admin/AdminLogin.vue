@@ -1,5 +1,5 @@
 <template>
-  <Head title="Admin Portal - Security Access" />
+  <Head title="Admin Login" />
 
   <div class="flex min-h-screen w-full bg-slate-900 text-slate-300">
     

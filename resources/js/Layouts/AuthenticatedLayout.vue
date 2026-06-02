@@ -189,9 +189,11 @@ const showingNavigationDropdown = ref(false);
                 </div>
             </header>
 
-            <!-- Page Content -->
-            <main>
-                <slot />
+            <!-- Page Content: container adds separation from top nav -->
+            <main class="flex-1">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-4 bg-white rounded-t-2xl shadow-sm">
+                    <slot />
+                </div>
             </main>
         </div>
     </div>

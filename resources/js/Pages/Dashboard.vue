@@ -340,10 +340,46 @@ onMounted(() => {
     fetchCategories();
     fetchGalleryItems();
 });
+
+// Read `tab` from URL query param so reload keeps active tab, and update URL when changing tabs
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const allowed = ['gallery', 'report', 'profile', 'settings'];
+    if (tab && allowed.includes(tab)) {
+        activeTab.value = tab;
+    }
+});
+
+const changeTab = (tab) => {
+    activeTab.value = tab;
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tab);
+        history.replaceState({}, '', url);
+    } catch (e) {
+        // ignore
+    }
+};
+
+const pageTitle = computed(() => {
+    switch (activeTab.value) {
+        case 'gallery':
+            return 'Found Gallery';
+        case 'report':
+            return 'Report Lost Item';
+        case 'profile':
+            return 'My Reports';
+        case 'settings':
+            return 'Settings';
+        default:
+            return 'Campus Lost & Found';
+    }
+});
 </script>
 
 <template>
-    <Head title="Campus Lost & Found" />
+    <Head :title="pageTitle" />
 
     <div class="text-gray-900 min-h-screen flex flex-col dashboard-body">
         <div class="flex flex-col min-h-screen w-full">
@@ -358,20 +394,20 @@ onMounted(() => {
                         </div>
 
                         <div class="hidden sm:flex sm:items-center sm:space-x-8">
-                            <button @click="activeTab = 'gallery'" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors', activeTab === 'gallery' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
+                            <button @click="changeTab('gallery')" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors', activeTab === 'gallery' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
                                 Found Gallery
                             </button>
-                            <button @click="activeTab = 'report'" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors', activeTab === 'report' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
+                            <button @click="changeTab('report')" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors', activeTab === 'report' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
                                 Report Lost Item
                             </button>
-                            <button @click="activeTab = 'profile'" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors relative', activeTab === 'profile' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
+                            <button @click="changeTab('profile')" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors relative', activeTab === 'profile' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
                                 My Reports
                                 <span class="ml-2 bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">1 Alert</span>
                             </button>
                         </div>
 
                         <div class="flex items-center space-x-4">
-                            <button @click="activeTab = 'settings'" :class="['p-2 rounded-full transition-colors', activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100']">
+                            <button @click="changeTab('settings')" :class="['p-2 rounded-full transition-colors', activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100']">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             </button>
                             <div class="flex items-center space-x-3 border-l border-gray-200 pl-4">
@@ -388,7 +424,7 @@ onMounted(() => {
                 </div>
             </header>
 
-            <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-4 bg-white rounded-t-2xl shadow-sm">
                 <transition name="fade" mode="out-in">
                     <div v-if="activeTab === 'gallery'" class="space-y-6">
                         <div class="bg-indigo-700 rounded-3xl shadow-lg overflow-hidden relative">

@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Head title="Campus L&F - Admin Dashboard" />
+        <Head title="Admin Dashboard" />
         <!-- Page content is rendered inside AdminLayout via layout slot -->
           <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 shadow-sm">
               <div>

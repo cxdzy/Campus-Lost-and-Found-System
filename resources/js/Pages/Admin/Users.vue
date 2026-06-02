@@ -1,5 +1,6 @@
 <template>
   <div class="p-6 space-y-6">
+    <Head title="Users" />
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Users</h1>
@@ -108,6 +109,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const roleOptions = ['Admin', 'Security']
