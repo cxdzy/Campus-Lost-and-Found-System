@@ -3,7 +3,7 @@
 This project includes a recommended post-deploy script and a Dokploy hook to automate server-side deployment tasks.
 
 Files added
-- `scripts/deploy.sh` — main deploy script (pull, composer install, npm build, storage:link, migrate, cache clear, optional service reload).
+- `scripts/deploy.sh` — main deploy script (pull, composer install, npm build, storage:link, migrate, fetch remote images, cache clear, optional service reload).
 - `.dokploy/hooks/post-deploy.sh` — Dokploy hook that invokes `scripts/deploy.sh` after Dokploy places the code on the server.
 
 Important: DO NOT PUT SECRETS IN THE DOCKERFILE
@@ -25,8 +25,9 @@ Environment variables
   - VITE_APP_NAME (optional: set to "Campus Lost Found" or empty)
 
 After deploy
-- If you have existing items that store remote image URLs, run on the server:
-  php artisan items:fetch-remote-images --limit=200
+- The deploy script now runs `php artisan items:fetch-remote-images --limit=200` automatically.
+- If you need to reprocess a larger batch later, run:
+  php artisan items:fetch-remote-images --limit=500
 
 Notes and caveats
 - If your server does not have Node/npm, consider doing the frontend build in CI and deploying built `public/build` artifacts instead.

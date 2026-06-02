@@ -41,6 +41,13 @@ php artisan storage:link || true
 # Run migrations (force in production)
 php artisan migrate --force || true
 
+# Fetch remote images into local public storage so the site serves them reliably
+if php artisan list --format=txt 2>/dev/null | grep -q "items:fetch-remote-images"; then
+  php artisan items:fetch-remote-images --limit=200 || true
+else
+  echo "items:fetch-remote-images command not available yet; skipping image migration"
+fi
+
 # Clear and rebuild caches
 php artisan config:clear || true
 php artisan cache:clear || true
@@ -55,8 +62,5 @@ if command -v systemctl >/dev/null 2>&1; then
   sudo systemctl reload php7.4-fpm 2>/dev/null || true
   sudo systemctl reload nginx 2>/dev/null || true
 fi
-
-# Post-deploy note: If you have items with remote image URLs, run:
-# php artisan items:fetch-remote-images --limit=200
 
 echo "Deploy complete"
