@@ -122,8 +122,7 @@ const mapItemToCard = (item) => {
         category: categoryName,
         location: item.location_name ?? 'Unknown location',
         timeAgo: formatTimeAgo(item.created_at),
-        // Prefer explicit image_url returned by backend; fallback to image_path
-        image: normalizeImagePath(item.image_url ?? item.image_path),
+        image: item.image_url ? normalizeImagePath(item.image_url) : '/images/placeholder-item.svg',
     };
 };
 
@@ -134,7 +133,7 @@ const mapReportToCard = (item) => ({
     location: item.location_name ?? 'Unknown location',
     status: item.status ?? 'Pending',
     timeAgo: formatTimeAgo(item.created_at),
-    image: normalizeImagePath(item.image_url ?? item.image_path),
+    image: item.image_url ? normalizeImagePath(item.image_url) : '/images/placeholder-item.svg',
 });
 
 const reportItems = computed(() => myReports.value.map(mapReportToCard));

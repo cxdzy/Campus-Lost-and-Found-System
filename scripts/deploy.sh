@@ -48,6 +48,13 @@ else
   echo "items:fetch-remote-images command not available yet; skipping image migration"
 fi
 
+# Fix any stored image files that are missing their file extension
+if php artisan list --format=txt 2>/dev/null | grep -q "items:fix-extensions"; then
+  php artisan items:fix-extensions || true
+else
+  echo "items:fix-extensions command not available yet; skipping"
+fi
+
 # Clear and rebuild caches
 php artisan config:clear || true
 php artisan cache:clear || true
