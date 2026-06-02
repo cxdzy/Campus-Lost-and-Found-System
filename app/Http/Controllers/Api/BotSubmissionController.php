@@ -15,6 +15,23 @@ use Illuminate\Http\Request;
 
 class BotSubmissionController extends Controller
 {
+    private static function detectImageExtension(?string $contentType, string $body): string
+    {
+        if ($contentType) {
+            if (Str::contains($contentType, 'jpeg') || Str::contains($contentType, 'jpg')) return 'jpg';
+            if (Str::contains($contentType, 'png')) return 'png';
+            if (Str::contains($contentType, 'gif')) return 'gif';
+            if (Str::contains($contentType, 'webp')) return 'webp';
+        }
+        // Magic bytes fallback
+        $header = substr($body, 0, 12);
+        if (substr($header, 0, 3) === "\xFF\xD8\xFF") return 'jpg';
+        if (substr($header, 0, 8) === "\x89PNG\r\n\x1A\n") return 'png';
+        if (substr($header, 0, 3) === 'GIF') return 'gif';
+        if (substr($header, 0, 4) === 'RIFF' && substr($header, 8, 4) === 'WEBP') return 'webp';
+        return 'jpg';
+    }
+
     public function store(Request $request, VisionAiService $vision): JsonResponse
     {
         $validated = $request->validate([
@@ -62,16 +79,10 @@ class BotSubmissionController extends Controller
         try {
             $response = Http::timeout(10)->get($validated['image_url']);
             if ($response->successful() && $response->body()) {
-                $ext = null;
-                $contentType = $response->header('Content-Type');
-                if ($contentType) {
-                    if (Str::contains($contentType, 'jpeg')) $ext = 'jpg';
-                    elseif (Str::contains($contentType, 'png')) $ext = 'png';
-                    elseif (Str::contains($contentType, 'gif')) $ext = 'gif';
-                }
-
-                $filename = 'telegram_' . Str::random(12) . ($ext ? '.' . $ext : '');
-                $stored = Storage::disk('public')->put('found_items/' . $filename, $response->body());
+                $body = $response->body();
+                $ext = self::detectImageExtension($response->header('Content-Type'), $body);
+                $filename = 'telegram_' . Str::random(12) . '.' . $ext;
+                $stored = Storage::disk('public')->put('found_items/' . $filename, $body);
                 if ($stored) {
                     $imagePath = 'found_items/' . $filename;
                 }
