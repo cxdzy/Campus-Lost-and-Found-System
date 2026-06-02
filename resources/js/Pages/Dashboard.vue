@@ -67,7 +67,7 @@ const filteredItems = computed(() => {
 
 const normalizeImagePath = (path) => {
     if (!path) {
-        return '/images/placeholder.jpg';
+        return '/images/placeholder-item.svg';
     }
     // If already an absolute URL, return as-is
     if (path.startsWith('http')) {
@@ -464,7 +464,7 @@ const pageTitle = computed(() => {
                         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div v-for="item in filteredItems" :key="item.id" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group" @click="viewItem(item)">
                                 <div class="h-48 bg-gray-100 relative overflow-hidden">
-                                    <img :src="item.image" :alt="item.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='https://via.placeholder.com/400x300?text=Missing+Image';">
+                                    <img :src="item.image" :alt="item.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='/images/placeholder-item.svg';">
                                     <div class="absolute top-3 right-3 bg-white bg-opacity-90 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-bold text-gray-700 uppercase tracking-wide shadow-sm">
                                         {{ item.category }}
                                     </div>
