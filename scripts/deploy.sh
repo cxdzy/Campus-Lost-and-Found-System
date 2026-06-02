@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Deploy script for Campus Lost Found
+# Usage: run this on the server as a post-deploy hook (Dokploy post-deploy)
+# It pulls latest, installs PHP deps, builds frontend, links storage, runs migrations, clears caches, and restarts services.
+
+APP_DIR=$(cd "$(dirname "$0")/.." && pwd)
+cd "$APP_DIR"
+
+echo "Starting deploy in $APP_DIR"
+
+# Ensure we have a clean working copy and update
+if [ -d .git ]; then
+  git fetch --all --prune
+  git reset --hard origin/main
+else
+  echo "No .git directory — skipping git operations"
+fi
+
+# Install PHP dependencies
+if command -v composer >/dev/null 2>&1; then
+  composer install --no-dev --prefer-dist --optimize-autoloader
+else
+  echo "composer not found — ensure composer is installed on the server or build in CI"
+fi
+
+# Frontend build: ensure NODE env vars are present during build (VITE_APP_NAME etc.)
+if command -v npm >/dev/null 2>&1; then
+  echo "Building frontend (npm)"
+  # Use CI to set build-time vars if possible. Dokploy must expose VITE_APP_NAME to the build environment.
+  npm ci --silent
+  npm run build --silent
+else
+  echo "npm not found — skip frontend build (you should build assets in CI and deploy public/build)"
+fi
+
+# Create storage symlink if missing
+php artisan storage:link || true
+
+# Run migrations (force in production)
+php artisan migrate --force || true
+
+# Clear and rebuild caches
+php artisan config:clear || true
+php artisan cache:clear || true
+php artisan view:clear || true
+php artisan route:clear || true
+php artisan config:cache || true
+
+# Optional: run queued jobs or restart services (adjust service names to your server)
+if command -v systemctl >/dev/null 2>&1; then
+  echo "Reloading php-fpm and nginx if available"
+  sudo systemctl reload php8.1-fpm 2>/dev/null || true
+  sudo systemctl reload php7.4-fpm 2>/dev/null || true
+  sudo systemctl reload nginx 2>/dev/null || true
+fi
+
+# Post-deploy note: If you have items with remote image URLs, run:
+# php artisan items:fetch-remote-images --limit=200
+
+echo "Deploy complete"
