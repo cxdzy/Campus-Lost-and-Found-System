@@ -26,9 +26,17 @@ else
 fi
 
 # Frontend build: ensure NODE env vars are present during build (VITE_APP_NAME etc.)
+# Load nvm if available so the pinned Node version (.nvmrc = 22) is used
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$NVM_DIR/nvm.sh"
+  nvm use --no-use 2>/dev/null || true   # honour .nvmrc without install noise
+fi
+
 if command -v npm >/dev/null 2>&1; then
-  echo "Building frontend (npm)"
-  # Use CI to set build-time vars if possible. Dokploy must expose VITE_APP_NAME to the build environment.
+  NODE_VER=$(node --version 2>/dev/null || echo "unknown")
+  echo "Building frontend with Node $NODE_VER"
   npm ci --silent
   npm run build --silent
 else
