@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('ai_tags', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('item_id')->constrained('items');
+            $table->foreignId('found_item_id')->constrained('found_items');
             $table->string('tag_name');
             $table->float('confidence_level');
             $table->timestamps();

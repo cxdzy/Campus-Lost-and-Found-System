@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('matric_number')->unique();
+            $table->string('matric_number')->unique()->nullable();
             $table->string('telegram_chat_id')->nullable();
-            $table->enum('role', ['Admin', 'Security']);
+            $table->enum('role', ['Admin', 'Security', 'User'])->default('User');
             $table->string('password');
             $table->timestamps();
         });

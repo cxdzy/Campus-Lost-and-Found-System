@@ -13,28 +13,20 @@ class Item extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
         'category_id',
-        'type',
         'title_description',
         'latitude',
         'longitude',
         'location_name',
-        'image_path',
         'status',
     ];
 
     protected function casts(): array
     {
         return [
-            'latitude' => 'float',
+            'latitude'  => 'float',
             'longitude' => 'float',
         ];
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
     }
 
     public function category(): BelongsTo
@@ -42,9 +34,14 @@ class Item extends Model
         return $this->belongsTo(Category::class);
     }
 
-    public function aiTags(): HasMany
+    public function foundItem(): HasOne
     {
-        return $this->hasMany(AiTag::class);
+        return $this->hasOne(FoundItem::class, 'item_id');
+    }
+
+    public function lostItem(): HasOne
+    {
+        return $this->hasOne(LostItem::class, 'item_id');
     }
 
     public function matchAlertsAsLost(): HasMany
@@ -55,11 +52,6 @@ class Item extends Model
     public function matchAlertsAsFound(): HasMany
     {
         return $this->hasMany(MatchAlert::class, 'found_item_id');
-    }
-
-    public function claim(): HasOne
-    {
-        return $this->hasOne(Claim::class);
     }
 
     public function apiLogs(): HasMany

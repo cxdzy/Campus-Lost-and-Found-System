@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -14,11 +13,6 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'matric_number',
@@ -27,20 +21,10 @@ class User extends Authenticatable
         'password',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -48,19 +32,14 @@ class User extends Authenticatable
         ];
     }
 
-    public function items(): HasMany
+    public function finder(): HasOne
     {
-        return $this->hasMany(Item::class);
+        return $this->hasOne(Finder::class, 'user_id');
     }
 
-    public function claims(): HasMany
+    public function loser(): HasOne
     {
-        return $this->hasMany(Claim::class, 'claimant_user_id');
-    }
-
-    public function handledClaims(): HasMany
-    {
-        return $this->hasMany(Claim::class, 'security_guard_id');
+        return $this->hasOne(Loser::class, 'user_id');
     }
 
     public function isAdmin(): bool
@@ -76,5 +55,10 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->isAdmin() || $this->isSecurity();
+    }
+
+    public function isUser(): bool
+    {
+        return $this->role === 'User';
     }
 }

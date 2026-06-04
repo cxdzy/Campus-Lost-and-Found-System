@@ -4,25 +4,35 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Finder;
+use App\Models\FoundItem;
 use App\Models\Item;
-use App\Models\User;
+use App\Services\MatchingService;
+use App\Services\MockCloudVisionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class BotSubmissionController extends Controller
 {
+    public function __construct(
+        private MockCloudVisionService $visionService,
+        private MatchingService        $matchingService,
+    ) {}
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'image_url' => ['required', 'url'],
-            'caption'   => ['nullable', 'string', 'max:500'],
+            'image_url'        => ['required', 'url'],
+            'caption'          => ['nullable', 'string', 'max:500'],
+            'latitude'         => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude'        => ['nullable', 'numeric', 'between:-180,180'],
+            'telegram_chat_id' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // Download the image from the Telegram URL and save locally so we never
-        // hotlink to Telegram's CDN (avoids ERR_BLOCKED_BY_ORB and hides the bot token).
         $download = Http::timeout(15)->get($validated['image_url']);
 
         if (!$download->successful() || !$download->body()) {
@@ -32,10 +42,7 @@ class BotSubmissionController extends Controller
         $imageContent = $download->body();
         $ext          = $this->detectExtension($download->header('Content-Type'), $imageContent);
         $filename     = Str::uuid() . '.' . $ext;
-
         Storage::disk('public')->put('items/' . $filename, $imageContent);
-
-        // Store only the relative path — the backend converts it to a full URL on read.
         $imagePath = 'items/' . $filename;
 
         $title = trim($validated['caption'] ?? '') ?: 'Item reported via Telegram';
@@ -47,24 +54,50 @@ class BotSubmissionController extends Controller
                 ['icon_identifier' => 'others']
             );
 
-        $user = User::query()->where('matric_number', 'ADMIN-001')->first()
-            ?? User::query()->where('role', 'Admin')->first();
+        $lat = isset($validated['latitude'])  ? (float) $validated['latitude']  : 0.0;
+        $lng = isset($validated['longitude']) ? (float) $validated['longitude'] : 0.0;
 
-        if (!$user) {
-            return response()->json(['message' => 'No admin user found to assign submission to.'], 500);
+        DB::beginTransaction();
+        try {
+            $item = Item::create([
+                'category_id'       => $category->id,
+                'title_description' => $title,
+                'latitude'          => $lat,
+                'longitude'         => $lng,
+                'location_name'     => ($lat !== 0.0 || $lng !== 0.0)
+                                        ? "GPS: {$lat}, {$lng}"
+                                        : 'Telegram Bot',
+                'status'            => 'Pending',
+            ]);
+
+            // Resolve or create a Finder record for the Telegram user
+            $finderId = null;
+            if (!empty($validated['telegram_chat_id'])) {
+                $finder = Finder::firstOrCreate(
+                    ['telegram_chat_id' => $validated['telegram_chat_id']],
+                    ['user_id' => null],
+                );
+                // A Telegram-only finder may not have a users record; skip FK if null
+                if ($finder->user_id) {
+                    $finderId = $finder->user_id;
+                }
+            }
+
+            $foundItem = FoundItem::create([
+                'item_id'    => $item->id,
+                'finder_id'  => $finderId,
+                'image_path' => $imagePath,
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to save item: ' . $e->getMessage()], 500);
         }
 
-        $item = Item::create([
-            'user_id'           => $user->id,
-            'category_id'       => $category->id,
-            'type'              => 'Found',
-            'title_description' => $title,
-            'latitude'          => 0.0,
-            'longitude'         => 0.0,
-            'location_name'     => 'Telegram Bot',
-            'image_path'        => $imagePath,
-            'status'            => 'Pending',
-        ]);
+        // Run mock vision tagging and matching outside the transaction
+        $this->visionService->analyse($foundItem);
+        $this->matchingService->matchFoundItem($foundItem);
 
         return response()->json(['message' => 'Item saved successfully', 'id' => $item->id]);
     }

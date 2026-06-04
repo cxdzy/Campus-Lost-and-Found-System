@@ -19,5 +19,9 @@
         "tailwindcss": "^3.4.19",
         "vite": "^7.0.7",
         "vue": "^3.4.0"
+    },
+    "dependencies": {
+        "@vue-leaflet/vue-leaflet": "^0.10.1",
+        "leaflet": "^1.9.4"
     }
 }

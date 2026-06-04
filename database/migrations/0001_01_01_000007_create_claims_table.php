@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('claims', function (Blueprint $table) {
+        Schema::create('reownership_claims', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('item_id')->constrained('items');
-            $table->foreignId('claimant_user_id')->constrained('users');
+            $table->foreignId('found_item_id')->constrained('found_items');
+            $table->foreignId('loser_id')->constrained('losers', 'user_id');
             $table->foreignId('security_guard_id')->constrained('users');
             $table->string('otp_code');
-            $table->timestamp('claimed_at');
+            $table->timestamp('claimed_at')->nullable();
             $table->timestamps();
         });
     }
@@ -27,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('claims');
+        Schema::dropIfExists('reownership_claims');
     }
 };

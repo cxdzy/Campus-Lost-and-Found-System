@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import { LMap, LMarker, LTileLayer } from '@vue-leaflet/vue-leaflet';
 import { computed, onMounted, ref } from 'vue';
 
 const page = usePage();
@@ -49,8 +50,25 @@ const reportForm = ref({
     features: '',
     locationName: '',
     coords: '',
-    imageFile: null, // UPGRADED: Holds the raw File binary binary signature bundle
+    imageFile: null,
 });
+
+// Leaflet map state — default centre on UiTM Shah Alam
+const mapZoom   = ref(15);
+const mapCenter = ref([3.0697, 101.5037]);
+const markerLatLng = ref(null);
+
+const onMapClick = (event) => {
+    const { lat, lng } = event.latlng;
+    markerLatLng.value = [lat, lng];
+    reportForm.value.coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+};
+
+const onMarkerDragEnd = (event) => {
+    const { lat, lng } = event.target.getLatLng();
+    markerLatLng.value = [lat, lng];
+    reportForm.value.coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+};
 
 const isFoundReport = computed(() => reportForm.value.type === 'Found');
 
@@ -327,9 +345,6 @@ const viewItem = (item) => {
     console.log(`Opening detail view for: ${item.title}`);
 };
 
-const simulateMapPin = () => {
-    reportForm.value.coords = '3.0697, 101.5037';
-};
 
 onMounted(() => {
     if (props.items.length) {
@@ -566,16 +581,23 @@ const pageTitle = computed(() => {
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Last Known Location</label>
                                     <p class="text-xs text-gray-500 mb-4">Click on the map to drop a pin. This helps our algorithm calculate proximity to found items.</p>
 
-                                    <div @click="simulateMapPin" class="flex-1 w-full bg-indigo-50 rounded-xl border-2 border-dashed border-indigo-200 flex flex-col items-center justify-center relative cursor-pointer hover:bg-indigo-100 transition-colors min-h-[300px] overflow-hidden">
-                                        <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(#4f46e5 1px, transparent 1px); background-size: 20px 20px;"></div>
-
-                                        <div class="z-10 flex flex-col items-center">
-                                            <svg class="w-12 h-12 text-red-500 mb-2 drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path></svg>
-                                            <span class="text-sm font-bold text-indigo-900 bg-white px-4 py-2 rounded-lg shadow-sm border border-indigo-100">
-                                                {{ reportForm.coords ? `Coordinates Set: ${reportForm.coords}` : 'Click to place Google Maps Pin' }}
-                                            </span>
-                                        </div>
+                                    <div class="flex-1 rounded-xl overflow-hidden border border-gray-200 shadow-inner" style="min-height: 300px;">
+                                        <LMap :zoom="mapZoom" :center="mapCenter" style="height: 300px; width: 100%;" @click="onMapClick">
+                                            <LTileLayer
+                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+                                            />
+                                            <LMarker
+                                                v-if="markerLatLng"
+                                                :lat-lng="markerLatLng"
+                                                :draggable="true"
+                                                @dragend="onMarkerDragEnd"
+                                            />
+                                        </LMap>
                                     </div>
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        {{ reportForm.coords ? `📍 Pin set: ${reportForm.coords}` : 'Click anywhere on the map to drop a pin.' }}
+                                    </p>
 
                                     <div class="mt-6">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Location Name</label>

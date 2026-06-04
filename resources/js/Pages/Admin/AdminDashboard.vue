@@ -183,11 +183,20 @@
                   <div class="space-y-4">
                       <h3 class="text-sm font-bold text-slate-800 flex items-center">
                           <svg class="w-4 h-4 mr-2 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                          Spatial Mapping Data (Google Maps API)
+                          Spatial Mapping Data (OpenStreetMap)
                       </h3>
-                      <div class="w-full h-40 bg-slate-100 rounded-2xl border-2 border-slate-200 border-dashed flex flex-col items-center justify-center">
-                          <div class="text-xs font-mono text-slate-500 mb-2">{{ selectedItem.coords }}</div>
-                          <div class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Coordinates Verified</div>
+                      <div v-if="selectedItemLatLng" class="rounded-2xl overflow-hidden border border-slate-200 shadow-sm" style="height: 200px;">
+                          <LMap :zoom="16" :center="selectedItemLatLng" :options="{ zoomControl: true, dragging: false, scrollWheelZoom: false }" style="height: 200px; width: 100%;">
+                              <LTileLayer
+                                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                  attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+                              />
+                              <LMarker :lat-lng="selectedItemLatLng" />
+                          </LMap>
+                      </div>
+                      <div v-else class="w-full h-40 bg-slate-100 rounded-2xl border-2 border-slate-200 border-dashed flex flex-col items-center justify-center">
+                          <div class="text-xs font-mono text-slate-500 mb-2">{{ selectedItem.coords || 'No coordinates recorded' }}</div>
+                          <div class="text-[10px] font-bold text-slate-400 bg-slate-200 px-3 py-1 rounded-full">Location unavailable</div>
                       </div>
                   </div>
               </div>
@@ -204,9 +213,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import { onMounted, onUnmounted } from 'vue';
+import { LMap, LMarker, LTileLayer } from '@vue-leaflet/vue-leaflet';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 const activeTab = ref('inventory');
 const selectedItem = ref(null);
@@ -274,7 +283,17 @@ const apiLogs = ref([
 ]);
 
 const selectItem = (item) => selectedItem.value = item;
-const closeItem = () => selectedItem.value = null;
+const closeItem  = () => selectedItem.value = null;
+
+// Parse "lat, lng" string from inventory coords into a Leaflet LatLng array
+const selectedItemLatLng = computed(() => {
+    const coords = selectedItem.value?.coords;
+    if (!coords) return null;
+    const parts = String(coords).split(',').map(Number);
+    if (parts.length < 2 || parts.some(Number.isNaN)) return null;
+    if (parts[0] === 0 && parts[1] === 0) return null;
+    return parts.slice(0, 2);
+});
 
 const pushToast = (type, title, message = '') => {
     window.dispatchEvent(new CustomEvent('admin-toast', { detail: { type, title, message } }));

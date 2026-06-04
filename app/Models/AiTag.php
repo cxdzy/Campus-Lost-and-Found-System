@@ -11,7 +11,7 @@ class AiTag extends Model
     use HasFactory;
 
     protected $fillable = [
-        'item_id',
+        'found_item_id',
         'tag_name',
         'confidence_level',
     ];
@@ -23,8 +23,8 @@ class AiTag extends Model
         ];
     }
 
-    public function item(): BelongsTo
+    public function foundItem(): BelongsTo
     {
-        return $this->belongsTo(Item::class);
+        return $this->belongsTo(FoundItem::class, 'found_item_id', 'item_id');
     }
 }
