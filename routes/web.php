@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\ProfileController;
 use App\Models\Item;
+use App\Models\FoundItem;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,12 +19,13 @@ Route::get('/', function () {
 
     if (Schema::hasTable('items')) {
         $items = Item::query()
-            ->with('category')
+            ->with(['category', 'foundItem'])
+            ->has('foundItem')
             ->latest()
             ->take(12)
             ->get()
             ->map(function (Item $item) {
-                $image = $item->image_path;
+                $image = $item->foundItem?->image_path;
 
                 if (!$image) {
                     $image = null;
@@ -57,13 +59,13 @@ Route::get('/dashboard', function (Request $request) {
 
     if (Schema::hasTable('items')) {
         $items = Item::query()
-            ->with('category')
-            ->where('type', 'Found')
+            ->with(['category', 'foundItem'])
+            ->has('foundItem')
             ->latest()
             ->take(20)
             ->get()
             ->map(function (Item $item) {
-                $image = $item->image_path;
+                $image = $item->foundItem?->image_path;
 
                 if (!$image) {
                     $image = null;
@@ -72,27 +74,26 @@ Route::get('/dashboard', function (Request $request) {
                 }
 
                 return [
-                    'id' => $item->id,
+                    'id'               => $item->id,
                     'title_description' => $item->title_description,
-                    // Normalize category to a simple string so frontend filtering works consistently
-                    'category' => $item->category?->category_name,
-                    'location_name' => $item->location_name,
-                    'created_at' => $item->created_at,
-                    'image_url' => $image,
-                    'image_path' => $item->image_path,
+                    'category'         => $item->category?->category_name,
+                    'location_name'    => $item->location_name,
+                    'created_at'       => $item->created_at,
+                    'image_url'        => $image,
+                    'image_path'       => $image,
                 ];
             })
             ->all();
 
-        if ($user) {
-            $myReports = $user->items()
-                ->with('category')
-                ->where('type', 'Lost')
+        if ($user && $user->loser) {
+            $myReports = Item::query()
+                ->with(['category', 'foundItem'])
+                ->whereHas('lostItem', fn ($q) => $q->where('loser_id', $user->loser->user_id))
                 ->latest()
                 ->take(20)
                 ->get()
                 ->map(function (Item $item) {
-                    $image = $item->image_path;
+                    $image = $item->foundItem?->image_path;
 
                     if (!$image) {
                         $image = null;
@@ -101,14 +102,14 @@ Route::get('/dashboard', function (Request $request) {
                     }
 
                     return [
-                        'id' => $item->id,
+                        'id'               => $item->id,
                         'title_description' => $item->title_description,
-                        'category' => $item->category?->category_name,
-                        'location_name' => $item->location_name,
-                        'created_at' => $item->created_at,
-                        'status' => $item->status,
-                        'image_url' => $image,
-                        'image_path' => $item->image_path,
+                        'category'         => $item->category?->category_name,
+                        'location_name'    => $item->location_name,
+                        'created_at'       => $item->created_at,
+                        'status'           => $item->status,
+                        'image_url'        => $image,
+                        'image_path'       => $image,
                     ];
                 })
                 ->all();
