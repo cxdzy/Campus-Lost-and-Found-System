@@ -8,6 +8,7 @@ use App\Models\FoundItem;
 use App\Models\Item;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -103,6 +104,11 @@ Route::get('/dashboard', function (Request $request) {
                 ))
                 ->all();
         }
+    }
+
+    // Auto-seed categories if the table is empty or only has the bot-created "Others" row
+    if (Schema::hasTable('categories') && Category::count() < 2) {
+        Artisan::call('db:seed', ['--class' => 'CategorySeeder', '--force' => true]);
     }
 
     $categories = Schema::hasTable('categories')
