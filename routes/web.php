@@ -14,6 +14,35 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
+/**
+ * Resolve a public-facing image URL from a found_items image_path.
+ * Always returns the /storage/ prefixed path — never null — so the
+ * Docker fallback route (/storage/items/{filename}) can serve the file
+ * even when the public symlink is absent.
+ */
+function resolveItemPayload(Item $item): array
+{
+    $raw = $item->foundItem?->image_path;
+
+    if (!$raw) {
+        $imageUrl = null;
+    } elseif (Str::startsWith($raw, ['http://', 'https://'])) {
+        $imageUrl = $raw;
+    } else {
+        // Always build the URL — never short-circuit to null.
+        // The Docker fallback route will serve the file or return 404.
+        $imageUrl = '/storage/' . $raw;
+    }
+
+    return [
+        'title_description' => $item->title_description,
+        'category'          => $item->category?->category_name,
+        'location_name'     => $item->location_name,
+        'image_url'         => $imageUrl,
+        'image_path'        => $imageUrl,
+    ];
+}
+
 Route::get('/', function () {
     $items = [];
 
@@ -24,22 +53,12 @@ Route::get('/', function () {
             ->latest()
             ->take(12)
             ->get()
-            ->map(function (Item $item) {
-                $image = $item->foundItem?->image_path;
-
-                if (!$image) {
-                    $image = null;
-                } elseif (!Str::startsWith($image, ['http://', 'https://'])) {
-                    $image = Storage::disk('public')->exists($image) ? '/storage/' . $image : null;
-                }
-
-                return [
-                    'id' => $item->id,
-                    'image_url' => $image,
-                    'category' => $item->category?->category_name,
-                    'description' => $item->title_description,
-                ];
-            })
+            ->map(fn (Item $item) => [
+                'id'          => $item->id,
+                'image_url'   => resolveItemPayload($item)['image_url'],
+                'category'    => $item->category?->category_name,
+                'description' => $item->title_description,
+            ])
             ->all();
     }
 
@@ -64,25 +83,10 @@ Route::get('/dashboard', function (Request $request) {
             ->latest()
             ->take(20)
             ->get()
-            ->map(function (Item $item) {
-                $image = $item->foundItem?->image_path;
-
-                if (!$image) {
-                    $image = null;
-                } elseif (!Str::startsWith($image, ['http://', 'https://'])) {
-                    $image = Storage::disk('public')->exists($image) ? '/storage/' . $image : null;
-                }
-
-                return [
-                    'id'               => $item->id,
-                    'title_description' => $item->title_description,
-                    'category'         => $item->category?->category_name,
-                    'location_name'    => $item->location_name,
-                    'created_at'       => $item->created_at,
-                    'image_url'        => $image,
-                    'image_path'       => $image,
-                ];
-            })
+            ->map(fn (Item $item) => array_merge(
+                resolveItemPayload($item),
+                ['id' => $item->id, 'created_at' => $item->created_at]
+            ))
             ->all();
 
         if ($user && $user->loser) {
@@ -92,26 +96,10 @@ Route::get('/dashboard', function (Request $request) {
                 ->latest()
                 ->take(20)
                 ->get()
-                ->map(function (Item $item) {
-                    $image = $item->foundItem?->image_path;
-
-                    if (!$image) {
-                        $image = null;
-                    } elseif (!Str::startsWith($image, ['http://', 'https://'])) {
-                        $image = Storage::disk('public')->exists($image) ? '/storage/' . $image : null;
-                    }
-
-                    return [
-                        'id'               => $item->id,
-                        'title_description' => $item->title_description,
-                        'category'         => $item->category?->category_name,
-                        'location_name'    => $item->location_name,
-                        'created_at'       => $item->created_at,
-                        'status'           => $item->status,
-                        'image_url'        => $image,
-                        'image_path'       => $image,
-                    ];
-                })
+                ->map(fn (Item $item) => array_merge(
+                    resolveItemPayload($item),
+                    ['id' => $item->id, 'created_at' => $item->created_at, 'status' => $item->status]
+                ))
                 ->all();
         }
     }

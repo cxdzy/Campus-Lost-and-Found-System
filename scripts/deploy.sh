@@ -49,6 +49,9 @@ php artisan storage:link || true
 # Run migrations (force in production)
 php artisan migrate --force || true
 
+# Seed reference data (categories, default admin) — safe to re-run, uses updateOrInsert
+php artisan db:seed --force || true
+
 # Fetch remote images into local public storage so the site serves them reliably
 if php artisan list --format=txt 2>/dev/null | grep -q "items:fetch-remote-images"; then
   php artisan items:fetch-remote-images --limit=200 || true
