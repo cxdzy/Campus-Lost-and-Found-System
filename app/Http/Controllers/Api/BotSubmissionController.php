@@ -87,9 +87,42 @@ class BotSubmissionController extends Controller
             return response()->json(['message' => 'Failed to save item: ' . $e->getMessage()], 500);
         }
 
-        ProcessVisionTagsJob::dispatch($foundItem->item_id);
+        // Only dispatch vision+matching once GPS is known.
+        // When GPS is absent the bot will call update-location to supply it first.
+        $hasGps = ($lat !== 0.0 || $lng !== 0.0);
+        if ($hasGps) {
+            ProcessVisionTagsJob::dispatch($foundItem->item_id);
+        }
 
         return response()->json(['message' => 'Item saved successfully', 'id' => $item->id]);
+    }
+
+    public function updateLocation(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'found_item_id' => ['required', 'integer', 'exists:items,id'],
+            'latitude'      => ['required', 'numeric', 'between:-90,90'],
+            'longitude'     => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $item = Item::find($validated['found_item_id']);
+
+        if (!$item || !$item->foundItem) {
+            return response()->json(['message' => 'Found item not found.'], 404);
+        }
+
+        $lat = (float) $validated['latitude'];
+        $lng = (float) $validated['longitude'];
+
+        $item->update([
+            'latitude'      => $lat,
+            'longitude'     => $lng,
+            'location_name' => "GPS: {$lat}, {$lng}",
+        ]);
+
+        ProcessVisionTagsJob::dispatch($item->id);
+
+        return response()->json(['message' => 'Location updated and processing started.', 'id' => $item->id]);
     }
 
     private function detectExtension(?string $contentType, string $body): string

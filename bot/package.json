@@ -1,0 +1,16 @@
+{
+  "name": "campus-lost-found-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for Campus Lost & Found — Finder workflow",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
