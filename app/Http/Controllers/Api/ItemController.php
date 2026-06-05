@@ -67,7 +67,7 @@ class ItemController extends Controller
             'location_name'     => ['required', 'string', 'max:255'],
             'image_file'        => [
                 Rule::requiredIf(fn () => $request->string('type') === 'Found' && !$request->filled('image_path')),
-                'nullable', 'file', 'image', 'max:5120',
+                'nullable', 'file', 'image', 'max:20480',
             ],
             'image_path'        => ['nullable', 'string', 'max:500'],
             'status'            => ['nullable', 'string', 'in:Pending,Matched,Claimed'],

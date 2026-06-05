@@ -35,7 +35,7 @@ class StoreReportRequest extends FormRequest
                 'nullable',
                 'file',
                 'image',
-                'max:5120',
+                'max:20480',
             ],
         ];
     }

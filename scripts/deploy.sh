@@ -73,6 +73,13 @@ php artisan view:clear || true
 php artisan route:clear || true
 php artisan config:cache || true
 
+# Apply nginx upload-size snippet so client_max_body_size matches app limits
+NGINX_CONF_D="/etc/nginx/conf.d"
+if [ -d "$NGINX_CONF_D" ]; then
+  echo "Installing nginx upload config"
+  sudo cp "$APP_DIR/docker/nginx-upload.conf" "$NGINX_CONF_D/campus-upload.conf" 2>/dev/null || true
+fi
+
 # Optional: run queued jobs or restart services (adjust service names to your server)
 if command -v systemctl >/dev/null 2>&1; then
   echo "Reloading php-fpm and nginx if available"
