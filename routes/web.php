@@ -184,4 +184,22 @@ Route::get('/symlink-fix', function () {
     return 'Storage linked successfully!';
 });
 
+// ── Docker/Dokploy Symlink Bypass ───────────────────────────────────────────
+// If the web server fails to resolve the public/storage symlink, Laravel
+// intercepts the request and serves the file directly from internal storage.
+Route::get('/storage/items/{filename}', function (string $filename) {
+    $path = storage_path('app/public/items/' . $filename);
+
+    if (!file_exists($path)) {
+        abort(404, 'Image not found on disk.');
+    }
+
+    $mimeType = \Illuminate\Support\Facades\File::mimeType($path);
+
+    return response()->file($path, [
+        'Content-Type'  => $mimeType,
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->where('filename', '.*');
+
 require __DIR__.'/auth.php';
