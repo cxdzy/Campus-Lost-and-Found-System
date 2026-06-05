@@ -3,8 +3,9 @@
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\ProfileController;
-use App\Models\Item;
+use App\Models\Category;
 use App\Models\FoundItem;
+use App\Models\Item;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -104,9 +105,14 @@ Route::get('/dashboard', function (Request $request) {
         }
     }
 
+    $categories = Schema::hasTable('categories')
+        ? Category::orderBy('category_name')->get(['id', 'category_name', 'icon_identifier'])->all()
+        : [];
+
     return Inertia::render('Dashboard', [
-        'items' => $items,
-        'myReports' => $myReports,
+        'items'      => $items,
+        'myReports'  => $myReports,
+        'categories' => $categories,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 

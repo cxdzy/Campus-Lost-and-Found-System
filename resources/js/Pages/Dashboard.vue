@@ -14,6 +14,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    categories: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const activeTab = ref('gallery');
@@ -181,17 +185,11 @@ const deleteSelectedReport = async () => {
     }
 };
 
-const fetchCategories = async () => {
-    categoryError.value = '';
-    try {
-        const response = await window.axios.get('/dashboard/data/categories');
-        categoryOptions.value = response.data?.data ?? [];
-        if (!reportForm.value.categoryId && categoryOptions.value.length > 0) {
-            reportForm.value.categoryId = categoryOptions.value[0].id;
-        }
-    } catch (error) {
-        console.error('Failed to load categories', error);
-        categoryError.value = 'Unable to load categories. Please refresh.';
+const seedCategories = (list) => {
+    if (!list || list.length === 0) return;
+    categoryOptions.value = list;
+    if (!reportForm.value.categoryId) {
+        reportForm.value.categoryId = list[0].id;
     }
 };
 
@@ -329,10 +327,9 @@ const viewItem = (item) => {
 
 
 onMounted(() => {
-    // Seed gallery from Inertia props — no axios call needed
     galleryItems.value = props.items.map(mapItemToCard);
     myReports.value = props.myReports;
-    fetchCategories();
+    seedCategories(props.categories);
 });
 
 // Read `tab` from URL query param so reload keeps active tab, and update URL when changing tabs
