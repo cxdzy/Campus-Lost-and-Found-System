@@ -11,6 +11,7 @@
  * Required env vars:
  *   TELEGRAM_BOT_TOKEN   — from BotFather
  *   LARAVEL_APP_URL      — e.g. https://your-dokploy-domain.com
+ *   LARAVEL_BOT_SECRET   — shared secret checked by BotSubmissionController
  */
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -18,11 +19,17 @@ const axios       = require('axios');
 
 const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN;
 const LARAVEL_URL = process.env.LARAVEL_APP_URL;
+const BOT_SECRET  = process.env.LARAVEL_BOT_SECRET;
 
 if (!BOT_TOKEN || !LARAVEL_URL) {
     console.error('Missing required env vars: TELEGRAM_BOT_TOKEN, LARAVEL_APP_URL');
     process.exit(1);
 }
+
+const botHeaders = {
+    'Content-Type': 'application/json',
+    ...(BOT_SECRET ? { 'X-Bot-Secret': BOT_SECRET } : {}),
+};
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
@@ -101,7 +108,7 @@ bot.on('photo', async (msg) => {
                 caption:          caption,
                 telegram_chat_id: String(chatId),
             },
-            { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+            { headers: botHeaders, timeout: 20000 }
         );
 
         const foundItemId = response.data?.id;
@@ -162,7 +169,7 @@ bot.on('location', async (msg) => {
                 latitude,
                 longitude,
             },
-            { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+            { headers: botHeaders, timeout: 10000 }
         );
 
         await bot.sendMessage(chatId,

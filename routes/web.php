@@ -84,7 +84,12 @@ Route::get('/dashboard', function (Request $request) {
             ->get()
             ->map(fn (Item $item) => array_merge(
                 resolveItemPayload($item),
-                ['id' => $item->id, 'created_at' => $item->created_at]
+                [
+                    'id'         => $item->id,
+                    'created_at' => $item->created_at,
+                    'latitude'   => $item->latitude,
+                    'longitude'  => $item->longitude,
+                ]
             ))
             ->all();
 
@@ -112,10 +117,18 @@ Route::get('/dashboard', function (Request $request) {
         ? Category::orderBy('category_name')->get(['id', 'category_name', 'icon_identifier'])->all()
         : [];
 
+    $alertCount = 0;
+    if ($user && $user->loser && Schema::hasTable('match_alerts')) {
+        $loserItemIds = \App\Models\LostItem::where('loser_id', $user->loser->user_id)
+            ->pluck('item_id');
+        $alertCount = \App\Models\MatchAlert::whereIn('lost_item_id', $loserItemIds)->where('is_notified', false)->count();
+    }
+
     return Inertia::render('Dashboard', [
         'items'      => $items,
         'myReports'  => $myReports,
         'categories' => $categories,
+        'alertCount' => $alertCount,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 

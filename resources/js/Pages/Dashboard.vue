@@ -18,6 +18,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    alertCount: {
+        type: Number,
+        default: 0,
+    },
 });
 
 const activeTab = ref('gallery');
@@ -145,6 +149,8 @@ const mapItemToCard = (item) => {
         location: item.location_name ?? 'Unknown location',
         timeAgo: formatTimeAgo(item.created_at),
         image: item.image_url ? normalizeImagePath(item.image_url) : '/images/placeholder-item.svg',
+        lat: item.latitude ?? null,
+        lng: item.longitude ?? null,
     };
 };
 
@@ -168,6 +174,24 @@ const openReportModal = (item) => {
 const closeReportModal = () => {
     isReportModalOpen.value = false;
     selectedReport.value = null;
+};
+
+const isMapModalOpen = ref(false);
+const mapModalCenter = ref([3.0697, 101.5037]);
+const mapModalZoom = ref(15);
+const activeMapPin = ref(null);
+
+const openMapModal = () => {
+    const withCoords = galleryItems.value.filter((i) => i.lat && i.lng);
+    if (withCoords.length > 0) {
+        mapModalCenter.value = [withCoords[0].lat, withCoords[0].lng];
+    }
+    isMapModalOpen.value = true;
+};
+
+const closeMapModal = () => {
+    isMapModalOpen.value = false;
+    activeMapPin.value = null;
 };
 
 const fetchGalleryItems = async () => {
@@ -411,7 +435,7 @@ const pageTitle = computed(() => {
                             </button>
                             <button @click="changeTab('profile')" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full transition-colors relative', activeTab === 'profile' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']">
                                 My Reports
-                                <span class="ml-2 bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">1 Alert</span>
+                                <span v-if="alertCount > 0" class="ml-2 bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">{{ alertCount }} Alert{{ alertCount !== 1 ? 's' : '' }}</span>
                             </button>
                         </div>
 
@@ -455,7 +479,7 @@ const pageTitle = computed(() => {
                                 {{ cat }}
                             </button>
                             <div class="flex-grow"></div>
-                            <button class="flex items-center text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors">
+                            <button @click="openMapModal" class="flex items-center text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
                                 View on Map
                             </button>
@@ -823,4 +847,61 @@ const pageTitle = computed(() => {
             </main>
         </div>
     </div>
+
+    <!-- View on Map modal -->
+    <teleport to="body">
+        <transition name="fade">
+            <div v-if="isMapModalOpen" class="fixed inset-0 z-50 flex flex-col">
+                <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" @click="closeMapModal"></div>
+
+                <div class="relative z-10 m-auto w-full max-w-5xl h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+                    <!-- Header -->
+                    <div class="bg-white px-6 py-4 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-widest text-indigo-500">Found Items</p>
+                            <h3 class="text-xl font-bold text-gray-900">Map View</h3>
+                        </div>
+                        <button @click="closeMapModal" class="rounded-full p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- Map -->
+                    <div class="flex-1 relative">
+                        <LMap :zoom="mapModalZoom" :center="mapModalCenter" style="height: 100%; width: 100%;">
+                            <LTileLayer
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+                            />
+                            <template v-for="item in galleryItems" :key="item.id">
+                                <LMarker
+                                    v-if="item.lat && item.lng"
+                                    :lat-lng="[item.lat, item.lng]"
+                                    @click="activeMapPin = activeMapPin?.id === item.id ? null : item"
+                                />
+                            </template>
+                        </LMap>
+
+                        <!-- Popup card for active pin -->
+                        <transition name="fade">
+                            <div v-if="activeMapPin" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-[9999] w-72 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                                <div class="h-32 bg-gray-100">
+                                    <img :src="activeMapPin.image" :alt="activeMapPin.title" class="w-full h-full object-cover" onerror="this.src='/images/placeholder-item.svg';">
+                                </div>
+                                <div class="p-4">
+                                    <p class="text-xs font-bold uppercase tracking-widest text-indigo-500">{{ activeMapPin.category }}</p>
+                                    <h4 class="text-sm font-bold text-gray-900 mt-1 truncate">{{ activeMapPin.title }}</h4>
+                                    <p class="text-xs text-gray-500 mt-1 flex items-center">
+                                        <svg class="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                        {{ activeMapPin.location }}
+                                    </p>
+                                    <p class="text-xs text-gray-400 mt-0.5">Found {{ activeMapPin.timeAgo }}</p>
+                                </div>
+                            </div>
+                        </transition>
+                    </div>
+                </div>
+            </div>
+        </transition>
+    </teleport>
 </template>

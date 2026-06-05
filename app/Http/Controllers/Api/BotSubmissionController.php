@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Finder;
 use App\Models\FoundItem;
 use App\Models\Item;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,9 +18,20 @@ use Illuminate\Support\Str;
 
 class BotSubmissionController extends Controller
 {
+    private function authorizeBot(Request $request): ?JsonResponse
+    {
+        $secret = config('services.bot.secret');
+        if ($secret && $request->header('X-Bot-Secret') !== $secret) {
+            return response()->json(['message' => 'Unauthorized.'], 401);
+        }
+        return null;
+    }
 
     public function store(Request $request): JsonResponse
     {
+        if ($deny = $this->authorizeBot($request)) {
+            return $deny;
+        }
         $validated = $request->validate([
             'image_url'        => ['required', 'url'],
             'caption'          => ['nullable', 'string', 'max:500'],
@@ -69,14 +81,33 @@ class BotSubmissionController extends Controller
                 'status'            => 'Pending',
             ]);
 
-            // Attempt to resolve an existing Finder record for the Telegram user.
-            // Do NOT use firstOrCreate — user_id cannot be null in the DB.
+            // Resolve or auto-create a Finder profile for this Telegram account.
+            // Pattern: Finder → User (TPT). We look up by telegram_chat_id on the
+            // finders table first; if absent, we find-or-create the parent User then
+            // create the Finder row so finder_id is never left null.
             $finderId = null;
             if (!empty($validated['telegram_chat_id'])) {
-                $finder = Finder::where('telegram_chat_id', $validated['telegram_chat_id'])->first();
-                if ($finder && $finder->user_id) {
-                    $finderId = $finder->user_id;
+                $chatId = $validated['telegram_chat_id'];
+
+                $finder = Finder::where('telegram_chat_id', $chatId)->first();
+
+                if (!$finder) {
+                    $botUser = User::firstOrCreate(
+                        ['telegram_chat_id' => $chatId],
+                        [
+                            'name'     => 'Telegram #' . $chatId,
+                            'role'     => 'User',
+                            'password' => Str::random(32),
+                        ]
+                    );
+
+                    $finder = Finder::firstOrCreate(
+                        ['user_id'          => $botUser->id],
+                        ['telegram_chat_id' => $chatId]
+                    );
                 }
+
+                $finderId = $finder->user_id;
             }
 
             $foundItem = FoundItem::create([
@@ -103,6 +134,9 @@ class BotSubmissionController extends Controller
 
     public function updateLocation(Request $request): JsonResponse
     {
+        if ($deny = $this->authorizeBot($request)) {
+            return $deny;
+        }
         $validated = $request->validate([
             'found_item_id' => ['required', 'integer', 'exists:items,id'],
             'latitude'      => ['required', 'numeric', 'between:-90,90'],

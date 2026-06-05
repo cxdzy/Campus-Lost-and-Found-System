@@ -167,9 +167,8 @@ inside the HTTP request. This must be fixed before real OpenCV is added.
 4. **`.env.example` gaps** — Missing full Postgres block and `LARAVEL_BOT_SECRET`
 
 ### 🟠 P3 — Core missing features
-5. **Bot → Laravel integration** — Bot never calls `BotSubmissionController`. Wire it:
-   bot POSTs to Laravel API after photo received + after GPS received.
-6. **GPS step in bot** — Bot currently stops after photo. Add location request step.
+5. ~~**Bot → Laravel integration**~~ ✅ Fixed
+6. ~~**GPS step in bot**~~ ✅ Fixed
 7. ~~**Queue job for vision**~~ ✅ Fixed — `app/Jobs/ProcessVisionTagsJob.php`, dispatched
    from `BotSubmissionController` and `ItemController` after commit. Worker runs permanently
    in Dokploy via Advanced → Run Command.
@@ -180,6 +179,11 @@ inside the HTTP request. This must be fixed before real OpenCV is added.
 ### ⚪ P4 — UI polish
 9. **"View on Map" button** — `Dashboard.vue:441` exists but does nothing
 10. **"1 Alert" badge** — `Dashboard.vue:397` hardcoded, not driven by real data
+11. **Map modal shows max 20 items** — capped by SSR gallery query. 
+    Fix later: separate paginated endpoint for map pins.
+12. **Popup z-index inside Leaflet DOM** — may clip on some browsers. 
+    Fix: render popup outside LMap element.
+    
 
 ## 8. Existing Code Patterns to Follow
 
