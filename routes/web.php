@@ -191,6 +191,13 @@ Route::get('/seed-categories', function () {
     return 'Categories seeded: ' . $categories->join(', ');
 });
 
+// Temporary: run any pending migrations instantly without a full redeploy.
+Route::get('/run-migrations', function () {
+    Artisan::call('migrate', ['--force' => true]);
+    $output = Artisan::output();
+    return '<pre>' . $output . '</pre>Done.';
+});
+
 // ── Docker/Dokploy Symlink Bypass ───────────────────────────────────────────
 // If the web server fails to resolve the public/storage symlink, Laravel
 // intercepts the request and serves the file directly from internal storage.
