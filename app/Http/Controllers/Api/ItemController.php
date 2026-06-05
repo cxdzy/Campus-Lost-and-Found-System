@@ -103,9 +103,16 @@ class ItemController extends Controller
                     return response()->json(['message' => 'Only registered students (Loser profile) can report lost items.'], 403);
                 }
 
+                // Save reference image if the user attached one (optional for lost reports)
+                $refImagePath = null;
+                if ($request->hasFile('image_file')) {
+                    $refImagePath = $request->file('image_file')->store('items', 'public');
+                }
+
                 $lostItem = LostItem::create([
-                    'item_id'  => $item->id,
-                    'loser_id' => $user->loser->user_id,
+                    'item_id'    => $item->id,
+                    'loser_id'   => $user->loser->user_id,
+                    'image_path' => $refImagePath,
                 ]);
             }
 

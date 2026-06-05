@@ -24,15 +24,14 @@ use Inertia\Inertia;
  */
 function resolveItemPayload(Item $item): array
 {
-    $raw = $item->foundItem?->image_path;
+    // Found items carry their image; lost items may carry an optional reference image
+    $raw = $item->foundItem?->image_path ?? $item->lostItem?->image_path;
 
     if (!$raw) {
         $imageUrl = null;
     } elseif (Str::startsWith($raw, ['http://', 'https://'])) {
         $imageUrl = $raw;
     } else {
-        // Always build the URL — never short-circuit to null.
-        // The Docker fallback route will serve the file or return 404.
         $imageUrl = '/storage/' . $raw;
     }
 
@@ -93,7 +92,7 @@ Route::get('/dashboard', function (Request $request) {
 
         if ($user && $user->loser) {
             $myReports = Item::query()
-                ->with(['category', 'foundItem'])
+                ->with(['category', 'lostItem'])
                 ->whereHas('lostItem', fn ($q) => $q->where('loser_id', $user->loser->user_id))
                 ->latest()
                 ->take(20)

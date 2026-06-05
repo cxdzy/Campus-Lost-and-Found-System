@@ -13,6 +13,7 @@ class LostItem extends Model
     protected $fillable = [
         'item_id',
         'loser_id',
+        'image_path',
     ];
 
     public function item(): BelongsTo

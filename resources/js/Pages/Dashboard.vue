@@ -155,7 +155,7 @@ const mapReportToCard = (item) => ({
     location: item.location_name ?? 'Unknown location',
     status: item.status ?? 'Pending',
     timeAgo: formatTimeAgo(item.created_at),
-    image: item.image_url ? normalizeImagePath(item.image_url) : '/images/placeholder-item.svg',
+    image: item.image_url ? normalizeImagePath(item.image_url) : null,
 });
 
 const reportItems = computed(() => myReports.value.map(mapReportToCard));
@@ -628,8 +628,12 @@ const pageTitle = computed(() => {
                             <div v-for="item in reportItems" :key="item.id" :class="['rounded-2xl p-6 shadow-md relative overflow-hidden flex flex-col sm:flex-row gap-6 border', item.status === 'Matched' ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200']">
                                 <div v-if="item.status === 'Matched'" class="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-bl-full -z-10"></div>
 
-                                <div class="w-full sm:w-48 h-32 bg-white rounded-xl border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                    <img :src="item.image" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='/images/placeholder-item.svg';">
+                                <div class="w-full sm:w-48 h-32 flex-shrink-0 rounded-xl overflow-hidden border border-gray-200">
+                                    <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-full object-cover">
+                                    <div v-else class="w-full h-full bg-gray-50 flex flex-col items-center justify-center gap-1">
+                                        <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        <span class="text-[11px] font-medium text-gray-400">No reference photo</span>
+                                    </div>
                                 </div>
 
                                 <div class="flex-1 flex flex-col justify-between">
@@ -675,7 +679,12 @@ const pageTitle = computed(() => {
 
                                     <div class="p-6 grid gap-6 md:grid-cols-[220px_1fr]">
                                         <div class="rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 shadow-sm h-56 md:h-full min-h-[220px]">
-                                            <img :src="selectedReport.image" :alt="selectedReport.title" class="w-full h-full object-cover" onerror="this.src='/images/placeholder-item.svg';">
+                                            <img v-if="selectedReport.image" :src="selectedReport.image" :alt="selectedReport.title" class="w-full h-full object-cover">
+                                            <div v-else class="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-50">
+                                                <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                                <span class="text-sm font-medium text-gray-400">No reference photo</span>
+                                                <span class="text-xs text-gray-300">Optional for lost reports</span>
+                                            </div>
                                         </div>
 
                                         <div class="space-y-5">
