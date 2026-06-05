@@ -26,6 +26,7 @@ class BotSubmissionController extends Controller
             'latitude'         => ['nullable', 'numeric', 'between:-90,90'],
             'longitude'        => ['nullable', 'numeric', 'between:-180,180'],
             'telegram_chat_id' => ['nullable', 'string', 'max:255'],
+            'category_id'      => ['nullable', 'integer'],
         ]);
 
         $download = Http::timeout(15)->get($validated['image_url']);
@@ -42,9 +43,12 @@ class BotSubmissionController extends Controller
 
         $title = trim($validated['caption'] ?? '') ?: 'Item reported via Telegram';
 
-        $category = Category::query()->where('category_name', 'Others')->first()
-            ?? Category::query()->first()
-            ?? Category::query()->firstOrCreate(
+        $category = (!empty($validated['category_id'])
+                ? Category::find($validated['category_id'])
+                : null)
+            ?? Category::where('category_name', 'Others')->first()
+            ?? Category::first()
+            ?? Category::firstOrCreate(
                 ['category_name' => 'Others'],
                 ['icon_identifier' => 'others']
             );
