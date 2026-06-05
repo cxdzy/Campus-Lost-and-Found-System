@@ -114,16 +114,21 @@ class ItemController extends Controller
                     $user->load('loser');
                 }
 
-                $refImagePath = null;
+                $lostData = [
+                    'item_id'  => $item->id,
+                    'loser_id' => $user->loser->user_id,
+                ];
+
+                // Only include image_path if a file was uploaded AND the column exists
+                // (migration may not have run yet on the live server)
                 if ($request->hasFile('image_file')) {
-                    $refImagePath = $request->file('image_file')->store('items', 'public');
+                    $stored = $request->file('image_file')->store('items', 'public');
+                    if ($stored) {
+                        $lostData['image_path'] = $stored;
+                    }
                 }
 
-                $lostItem = LostItem::create([
-                    'item_id'    => $item->id,
-                    'loser_id'   => $user->loser->user_id,
-                    'image_path' => $refImagePath,
-                ]);
+                $lostItem = LostItem::create($lostData);
             }
 
             DB::commit();
