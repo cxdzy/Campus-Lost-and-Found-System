@@ -195,24 +195,6 @@ const fetchCategories = async () => {
     }
 };
 
-const fetchGalleryItems = async () => {
-    isLoadingGallery.value = true;
-    galleryError.value = '';
-    try {
-        const response = await window.axios.get('/dashboard/data/items', {
-            params: {
-                type: 'Found',
-            },
-        });
-        const items = response.data?.data ?? [];
-        galleryItems.value = items.map(mapItemToCard);
-    } catch (error) {
-        console.error('Failed to load items', error);
-        galleryError.value = 'Failed to load found items. Please refresh.';
-    } finally {
-        isLoadingGallery.value = false;
-    }
-};
 
 // NEW: Captures browser input changes, updates file objects, and hooks preview stream paths
 const handleImageUpload = (event) => {
@@ -347,12 +329,10 @@ const viewItem = (item) => {
 
 
 onMounted(() => {
-    if (props.items.length) {
-        galleryItems.value = props.items.map(mapItemToCard);
-    }
+    // Seed gallery from Inertia props — no axios call needed
+    galleryItems.value = props.items.map(mapItemToCard);
     myReports.value = props.myReports;
     fetchCategories();
-    fetchGalleryItems();
 });
 
 // Read `tab` from URL query param so reload keeps active tab, and update URL when changing tabs

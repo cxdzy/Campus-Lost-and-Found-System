@@ -177,4 +177,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 });
 
+// Temporary one-shot route to create the storage symlink inside the deployed container.
+// Visit /symlink-fix once after each fresh deployment, then this route can be removed.
+Route::get('/symlink-fix', function () {
+    \Illuminate\Support\Facades\Artisan::call('storage:link');
+    return 'Storage linked successfully!';
+});
+
 require __DIR__.'/auth.php';
