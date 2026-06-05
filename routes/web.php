@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\ProfileController;
 use App\Models\Category;
-use App\Models\FoundItem;
 use App\Models\Item;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
@@ -12,7 +11,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -155,6 +153,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/reports', [\App\Http\Controllers\Admin\ReportsController::class, 'index'])->name('reports');
         Route::get('/users', [\App\Http\Controllers\Admin\UsersController::class, 'index'])->name('users');
+        Route::get('/match-alerts', [\App\Http\Controllers\Admin\MatchAlertsController::class, 'index'])->name('match-alerts');
+        Route::post('/match-alerts/{matchAlert}/verify', [\App\Http\Controllers\Admin\MatchAlertsController::class, 'verify'])->name('match-alerts.verify');
 
         // Admin API endpoints for managing users and reports
         Route::prefix('api')->name('api.')->group(function () {

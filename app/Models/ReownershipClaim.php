@@ -14,12 +14,14 @@ class ReownershipClaim extends Model
         'loser_id',
         'security_guard_id',
         'otp_code',
+        'expires_at',
         'claimed_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'expires_at' => 'datetime',
             'claimed_at' => 'datetime',
         ];
     }

@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessVisionTagsJob;
 use App\Models\Category;
 use App\Models\Finder;
 use App\Models\FoundItem;
 use App\Models\Item;
-use App\Services\MatchingService;
-use App\Services\MockCloudVisionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +17,6 @@ use Illuminate\Support\Str;
 
 class BotSubmissionController extends Controller
 {
-    public function __construct(
-        private MockCloudVisionService $visionService,
-        private MatchingService        $matchingService,
-    ) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -92,13 +87,7 @@ class BotSubmissionController extends Controller
             return response()->json(['message' => 'Failed to save item: ' . $e->getMessage()], 500);
         }
 
-        // Post-persist processing — failures must never fail the bot response
-        try {
-            $this->visionService->analyse($foundItem);
-            $this->matchingService->matchFoundItem($foundItem);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Bot post-submit error (item saved): ' . $e->getMessage());
-        }
+        ProcessVisionTagsJob::dispatch($foundItem->item_id);
 
         return response()->json(['message' => 'Item saved successfully', 'id' => $item->id]);
     }

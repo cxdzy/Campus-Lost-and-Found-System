@@ -7,13 +7,12 @@ use App\Models\FoundItem;
 use App\Models\Item;
 use App\Models\LostItem;
 use App\Models\MatchAlert;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class MatchingService
 {
-    private const MATCH_THRESHOLD = 0.80;
     private const MAX_DISTANCE_KM = 10.0;
+
+    public function __construct(private TelegramService $telegram) {}
 
     /**
      * Run matching after a found item is submitted.
@@ -42,7 +41,7 @@ class MatchingService
 
             $score = $this->computeScore($foundTags, $foundItemBase, $lostBase);
 
-            if ($score >= self::MATCH_THRESHOLD) {
+            if ($score >= (float) config('matching.threshold', 0.80)) {
                 $alert = MatchAlert::create([
                     'lost_item_id'  => $lostItem->item_id,
                     'found_item_id' => $foundItem->item_id,
@@ -83,7 +82,7 @@ class MatchingService
 
             $score = $this->computeScore($foundTags, $foundBase, $lostBase);
 
-            if ($score >= self::MATCH_THRESHOLD) {
+            if ($score >= (float) config('matching.threshold', 0.80)) {
                 $alert = MatchAlert::create([
                     'lost_item_id'  => $lostItem->item_id,
                     'found_item_id' => $foundItem->item_id,
@@ -163,26 +162,22 @@ class MatchingService
         LostItem   $lostItem,
         FoundItem  $foundItem,
     ): void {
-        $botWebhookUrl = config('services.telegram.bot_webhook_url');
-        if (!$botWebhookUrl) {
-            return;
-        }
-
         $loser = $lostItem->loser()->with('user')->first();
-        if (!$loser) {
+        if (!$loser?->user?->telegram_chat_id) {
             return;
         }
 
-        try {
-            Http::timeout(5)->post($botWebhookUrl . '/notify-match', [
-                'telegram_chat_id' => $loser->user->telegram_chat_id ?? $loser->user->matric_number,
-                'match_score'      => round($alert->match_score * 100, 1),
-                'lost_title'       => $lostItem->item->title_description,
-                'found_title'      => $foundItem->item->title_description,
-                'found_location'   => $foundItem->item->location_name,
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('Telegram match notification failed: ' . $e->getMessage());
-        }
+        $score   = round($alert->match_score * 100, 1);
+        $message = "🔍 <b>Match Alert — {$score}% confidence</b>\n\n"
+                 . "Your lost item <b>{$lostItem->item->title_description}</b> "
+                 . "may match a found item: <b>{$foundItem->item->title_description}</b>\n"
+                 . "📍 Found at: {$foundItem->item->location_name}\n\n"
+                 . "Visit the Campus Lost &amp; Found portal to generate your claim OTP.";
+
+        $this->telegram->sendMessage(
+            $loser->user->telegram_chat_id,
+            $message,
+            $foundItem->item_id,
+        );
     }
 }

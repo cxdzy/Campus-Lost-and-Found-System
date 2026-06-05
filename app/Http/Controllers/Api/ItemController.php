@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessVisionTagsJob;
 use App\Models\FoundItem;
 use App\Models\Item;
 use App\Models\Loser;
 use App\Models\LostItem;
 use App\Services\MatchingService;
-use App\Services\MockCloudVisionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,10 +20,7 @@ use Illuminate\Validation\Rule;
 
 class ItemController extends Controller
 {
-    public function __construct(
-        private MockCloudVisionService $visionService,
-        private MatchingService        $matchingService,
-    ) {}
+    public function __construct(private MatchingService $matchingService) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -136,16 +133,14 @@ class ItemController extends Controller
             return response()->json(['message' => 'Failed to save item: ' . $e->getMessage()], 500);
         }
 
-        // Post-persist processing — failures here must never fail the HTTP response
-        try {
-            if ($data['type'] === 'Found') {
-                $this->visionService->analyse($foundItem);
-                $this->matchingService->matchFoundItem($foundItem);
-            } else {
+        if ($data['type'] === 'Found') {
+            ProcessVisionTagsJob::dispatch($foundItem->item_id);
+        } else {
+            try {
                 $this->matchingService->matchLostItem($lostItem);
+            } catch (\Throwable $e) {
+                Log::warning('matchLostItem error (item saved): ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            Log::warning('Post-submit processing error (item saved successfully): ' . $e->getMessage());
         }
 
         $item->load(['category', 'foundItem.aiTags', 'lostItem']);

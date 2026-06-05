@@ -170,6 +170,23 @@ const closeReportModal = () => {
     selectedReport.value = null;
 };
 
+const fetchGalleryItems = async () => {
+    isLoadingGallery.value = true;
+    galleryError.value = '';
+    try {
+        const response = await window.axios.get('/dashboard/data/items', {
+            params: { type: 'Found', per_page: 20 },
+        });
+        const raw = response.data?.data ?? response.data;
+        const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
+        galleryItems.value = list.map(mapItemToCard);
+    } catch {
+        galleryError.value = 'Could not refresh the gallery. Please reload the page.';
+    } finally {
+        isLoadingGallery.value = false;
+    }
+};
+
 const deleteSelectedReport = async () => {
     if (!selectedReport.value) return;
 
