@@ -92,9 +92,13 @@ class BotSubmissionController extends Controller
             return response()->json(['message' => 'Failed to save item: ' . $e->getMessage()], 500);
         }
 
-        // Run mock vision tagging and matching outside the transaction
-        $this->visionService->analyse($foundItem);
-        $this->matchingService->matchFoundItem($foundItem);
+        // Post-persist processing — failures must never fail the bot response
+        try {
+            $this->visionService->analyse($foundItem);
+            $this->matchingService->matchFoundItem($foundItem);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Bot post-submit error (item saved): ' . $e->getMessage());
+        }
 
         return response()->json(['message' => 'Item saved successfully', 'id' => $item->id]);
     }

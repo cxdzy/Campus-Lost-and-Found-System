@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -121,12 +122,16 @@ class ItemController extends Controller
             return response()->json(['message' => 'Failed to save item: ' . $e->getMessage()], 500);
         }
 
-        // Post-persist async processing
-        if ($data['type'] === 'Found') {
-            $this->visionService->analyse($foundItem);
-            $this->matchingService->matchFoundItem($foundItem);
-        } else {
-            $this->matchingService->matchLostItem($lostItem);
+        // Post-persist processing — failures here must never fail the HTTP response
+        try {
+            if ($data['type'] === 'Found') {
+                $this->visionService->analyse($foundItem);
+                $this->matchingService->matchFoundItem($foundItem);
+            } else {
+                $this->matchingService->matchLostItem($lostItem);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Post-submit processing error (item saved successfully): ' . $e->getMessage());
         }
 
         $item->load(['category', 'foundItem.aiTags', 'lostItem']);
