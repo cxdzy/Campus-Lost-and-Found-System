@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FoundItem;
 use App\Models\Item;
+use App\Models\Loser;
 use App\Models\LostItem;
 use App\Services\MatchingService;
 use App\Services\MockCloudVisionService;
@@ -99,9 +100,18 @@ class ItemController extends Controller
                     'image_path' => $imagePath,
                 ]);
             } else {
-                if (!$user || !$user->loser) {
+                if (!$user) {
                     DB::rollBack();
-                    return response()->json(['message' => 'Only registered students (Loser profile) can report lost items.'], 403);
+                    return response()->json(['message' => 'Authentication required.'], 401);
+                }
+
+                // Auto-create a Loser profile if the account pre-dates the TPT schema migration
+                if (!$user->loser) {
+                    Loser::firstOrCreate(
+                        ['user_id' => $user->id],
+                        ['matric_number' => $user->matric_number ?? ('STUDENT-' . $user->id)]
+                    );
+                    $user->load('loser');
                 }
 
                 $refImagePath = null;

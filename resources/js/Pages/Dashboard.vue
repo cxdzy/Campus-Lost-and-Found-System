@@ -304,7 +304,8 @@ const submitReport = async () => {
         }, 5000);
     } catch (error) {
         console.error('Failed to submit report', error);
-        reportError.value = 'Unable to submit the report right now. Please try again.';
+        const serverMsg = error?.response?.data?.message;
+        reportError.value = serverMsg ?? 'Unable to submit the report right now. Please try again.';
     } finally {
         isSubmitting.value = false;
     }
