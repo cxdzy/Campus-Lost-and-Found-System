@@ -217,6 +217,13 @@ import { Head } from '@inertiajs/vue3';
 import { LMap, LMarker, LTileLayer } from '@vue-leaflet/vue-leaflet';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
+const props = defineProps({
+    items: {
+        type: Array,
+        default: () => [],
+    },
+});
+
 const activeTab = ref('inventory');
 const selectedItem = ref(null);
 const otpLoading = ref(false);
@@ -242,20 +249,17 @@ const handleImageError = (event) => {
     event.target.src = fallbackImage;
 };
 
-const mapReportToInventory = (r) => {
-    const item = r; // API returns report fields similar to Item model
-    return {
-        id: item.id,
-        title: item.title_description ?? item.title ?? 'Untitled',
-        category: (item.category && (typeof item.category === 'string' ? item.category : item.category?.category_name)) ?? 'Uncategorized',
-        location: item.location_name ?? 'Unknown location',
-        coords: (item.latitude && item.longitude) ? `${item.latitude}, ${item.longitude}` : (item.coords ?? ''),
-        status: item.status ?? 'Pending',
-        image: normalizeImagePath(item.image_url ?? item.image_path ?? ''),
-        confidence: item.confidence ?? item.ai_confidence ?? 0,
-        tags: Array.isArray(item.aiTags) ? item.aiTags.map(t => t.tag ?? t.name ?? String(t)) : (item.tags ?? []),
-    };
-};
+const mapReportToInventory = (item) => ({
+    id:         item.id,
+    title:      item.title_description ?? 'Untitled',
+    category:   typeof item.category === 'string' ? item.category : (item.category?.category_name ?? 'Uncategorized'),
+    location:   item.location_name ?? 'Unknown location',
+    coords:     (item.latitude && item.longitude) ? `${item.latitude}, ${item.longitude}` : '',
+    status:     item.status ?? 'Pending',
+    image:      normalizeImagePath(item.image_url ?? ''),
+    confidence: item.confidence ?? 0,
+    tags:       Array.isArray(item.tags) ? item.tags : [],
+});
 
 const matchAlerts = ref([
     { 
@@ -305,22 +309,11 @@ const onAdminTab = (e) => {
 
 onMounted(() => {
     window.addEventListener('admin-tab', onAdminTab);
-    // Load real inventory from admin API so the dashboard shows actual uploaded images
-    (async () => {
-        try {
-            const res = await window.axios.get('/admin/api/reports', {
-                params: {
-                    type: 'Found',
-                },
-            });
-            const items = res.data?.data ?? [];
-            inventory.value = items
-                .filter((item) => item.type === 'Found')
-                .map(mapReportToInventory);
-        } catch (e) {
-            console.error('Failed to load admin inventory', e);
-        }
-    })();
+
+    // Populate synchronously from Inertia props — no Axios call needed
+    if (props.items.length > 0) {
+        inventory.value = props.items.map(mapReportToInventory);
+    }
 });
 
 onUnmounted(() => {
