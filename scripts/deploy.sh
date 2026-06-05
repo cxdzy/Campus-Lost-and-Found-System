@@ -73,18 +73,17 @@ php artisan view:clear || true
 php artisan route:clear || true
 php artisan config:cache || true
 
-# Apply nginx upload-size snippet so client_max_body_size matches app limits
-NGINX_CONF_D="/etc/nginx/conf.d"
-if [ -d "$NGINX_CONF_D" ]; then
-  echo "Installing nginx upload config"
-  sudo cp "$APP_DIR/docker/nginx-upload.conf" "$NGINX_CONF_D/campus-upload.conf" 2>/dev/null || true
+# Patch client_max_body_size into /nginx.conf (Dokploy container uses a single flat config).
+# The check makes this idempotent — safe to run on every redeploy.
+if [ -f /nginx.conf ] && ! grep -q 'client_max_body_size' /nginx.conf; then
+  echo "Patching /nginx.conf: adding client_max_body_size 20M"
+  sed -i 's/http {/http {\n    client_max_body_size 20M;/' /nginx.conf
 fi
-
-# Optional: run queued jobs or restart services (adjust service names to your server)
+# Reload nginx to apply (works whether managed by systemctl or run directly in-container)
+if command -v nginx >/dev/null 2>&1; then
+  nginx -s reload 2>/dev/null || true
+fi
 if command -v systemctl >/dev/null 2>&1; then
-  echo "Reloading php-fpm and nginx if available"
-  sudo systemctl reload php8.1-fpm 2>/dev/null || true
-  sudo systemctl reload php7.4-fpm 2>/dev/null || true
   sudo systemctl reload nginx 2>/dev/null || true
 fi
 
