@@ -70,15 +70,12 @@ class BotSubmissionController extends Controller
                 'status'            => 'Pending',
             ]);
 
-            // Resolve or create a Finder record for the Telegram user
+            // Attempt to resolve an existing Finder record for the Telegram user.
+            // Do NOT use firstOrCreate — user_id cannot be null in the DB.
             $finderId = null;
             if (!empty($validated['telegram_chat_id'])) {
-                $finder = Finder::firstOrCreate(
-                    ['telegram_chat_id' => $validated['telegram_chat_id']],
-                    ['user_id' => null],
-                );
-                // A Telegram-only finder may not have a users record; skip FK if null
-                if ($finder->user_id) {
+                $finder = Finder::where('telegram_chat_id', $validated['telegram_chat_id'])->first();
+                if ($finder && $finder->user_id) {
                     $finderId = $finder->user_id;
                 }
             }

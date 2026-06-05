@@ -42,6 +42,7 @@ class ItemController extends Controller
 
         // Support filtering by the authenticated user's own items
         if ($request->boolean('mine') && Auth::check()) {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
             if ($user->isUser() && $user->loser) {
                 $query->whereHas('lostItem', fn ($q) => $q->where('loser_id', $user->loser->user_id));
