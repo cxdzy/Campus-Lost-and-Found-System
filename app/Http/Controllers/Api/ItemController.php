@@ -119,9 +119,8 @@ class ItemController extends Controller
                     'loser_id' => $user->loser->user_id,
                 ];
 
-                // Only include image_path if a file was uploaded AND the column exists
-                // (migration may not have run yet on the live server)
-                if ($request->hasFile('image_file')) {
+                // Only include image_path when the column exists in the DB
+                if ($request->hasFile('image_file') && \Illuminate\Support\Facades\Schema::hasColumn('lost_items', 'image_path')) {
                     $stored = $request->file('image_file')->store('items', 'public');
                     if ($stored) {
                         $lostData['image_path'] = $stored;
