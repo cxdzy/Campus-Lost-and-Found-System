@@ -13,7 +13,7 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $items = Item::with(['category', 'foundItem.aiTags'])
+        $items = Item::with(['category', 'foundItem.aiTags', 'matchAlertsAsFound'])
             ->has('foundItem')
             ->latest()
             ->get()
@@ -33,6 +33,8 @@ class DashboardController extends Controller
                     ? round($tags->avg('confidence_level') * 100, 1)
                     : 0;
 
+                $bestAlert = $item->matchAlertsAsFound->sortByDesc('match_score')->first();
+
                 return [
                     'id'                => $item->id,
                     'title_description' => $item->title_description,
@@ -44,6 +46,8 @@ class DashboardController extends Controller
                     'image_url'         => $image,
                     'confidence'        => $confidence,
                     'tags'              => $tags->pluck('tag_name')->all(),
+                    'match_alert_id'    => $bestAlert?->id,
+                    'match_score'       => $bestAlert ? round($bestAlert->match_score * 100, 1) : null,
                 ];
             })
             ->all();

@@ -250,13 +250,15 @@ const handleImageError = (event) => {
 };
 
 const mapReportToInventory = (item) => ({
-    id:         item.id,
-    title:      item.title_description ?? 'Untitled',
-    category:   typeof item.category === 'string' ? item.category : (item.category?.category_name ?? 'Uncategorized'),
-    location:   item.location_name ?? 'Unknown location',
-    coords:     (item.latitude && item.longitude) ? `${item.latitude}, ${item.longitude}` : '',
-    status:     item.status ?? 'Pending',
-    image:      normalizeImagePath(item.image_url ?? ''),
+    id:           item.id,
+    title:        item.title_description ?? 'Untitled',
+    category:     typeof item.category === 'string' ? item.category : (item.category?.category_name ?? 'Uncategorized'),
+    location:     item.location_name ?? 'Unknown location',
+    coords:       (item.latitude && item.longitude) ? `${item.latitude}, ${item.longitude}` : '',
+    status:       item.status ?? 'Pending',
+    image:        normalizeImagePath(item.image_url ?? ''),
+    matchAlertId: item.match_alert_id ?? null,
+    matchScore:   item.match_score ?? null,
     confidence: item.confidence ?? 0,
     tags:       Array.isArray(item.tags) ? item.tags : [],
 });
@@ -320,12 +322,21 @@ onUnmounted(() => {
     window.removeEventListener('admin-tab', onAdminTab);
 });
 
-const triggerOTP = () => {
+const triggerOTP = async () => {
+    if (!selectedItem.value?.matchAlertId) {
+        pushToast('error', 'No match alert', 'This item has no verified AI match yet. OTP handover is only available for matched items.');
+        return;
+    }
     otpLoading.value = true;
-    setTimeout(() => {
-        pushToast('success', 'OTP triggered', 'A 4-digit OTP has been queued for Telegram handover.');
+    try {
+        await window.axios.post(`/admin/match-alerts/${selectedItem.value.matchAlertId}/verify`);
+        pushToast('success', 'OTP sent', 'A 6-digit claim code has been sent to the student via Telegram.');
+    } catch (err) {
+        const msg = err?.response?.data?.message ?? 'Could not send OTP. Please try again.';
+        pushToast('error', 'OTP failed', msg);
+    } finally {
         otpLoading.value = false;
-    }, 1500);
+    }
 };
 </script>
 
