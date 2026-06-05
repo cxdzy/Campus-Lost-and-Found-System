@@ -184,6 +184,14 @@ Route::get('/symlink-fix', function () {
     return 'Storage linked successfully!';
 });
 
+// Temporary one-shot route to seed categories into the live database.
+// Visit /seed-categories once after deployment if the dropdown shows only "Others".
+Route::get('/seed-categories', function () {
+    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'CategorySeeder', '--force' => true]);
+    $categories = \App\Models\Category::orderBy('category_name')->pluck('category_name');
+    return 'Categories seeded: ' . $categories->join(', ');
+});
+
 // ── Docker/Dokploy Symlink Bypass ───────────────────────────────────────────
 // If the web server fails to resolve the public/storage symlink, Laravel
 // intercepts the request and serves the file directly from internal storage.
