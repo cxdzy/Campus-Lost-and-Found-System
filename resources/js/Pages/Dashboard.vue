@@ -44,7 +44,6 @@ const imagePreviewUrl = ref(null);
 const userProfile = ref({
     name: page.props.auth?.user?.name ?? 'Student',
     matric: page.props.auth?.user?.matric_number ?? '2024123456',
-    telegram: page.props.auth?.user?.telegram_chat_id ?? 'username',
     notifications: true,
 });
 
@@ -801,10 +800,21 @@ const pageTitle = computed(() => {
                                         </div>
 
                                         <div>
-                                            <label class="block text-sm font-bold text-gray-700 mb-2">Telegram Handle</label>
-                                            <div class="relative">
-                                                <span class="absolute left-4 top-3 text-gray-400 font-bold">@</span>
-                                                <input type="text" v-model="userProfile.telegram" class="w-full border border-gray-300 rounded-xl px-4 py-3 pl-9 text-sm text-indigo-700 font-bold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                                            <label class="block text-sm font-bold text-gray-700 mb-2">Telegram Account</label>
+
+                                            <div v-if="page.props.auth?.user?.telegram_chat_id" class="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                                                <svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                                <div>
+                                                    <p class="text-sm font-bold text-green-800">Connected</p>
+                                                    <p class="text-xs text-green-600">Telegram alerts are active for your account.</p>
+                                                </div>
+                                            </div>
+
+                                            <div v-else class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 space-y-2">
+                                                <p class="text-sm font-bold text-amber-900">Not connected</p>
+                                                <p class="text-sm text-amber-800 leading-relaxed">Open the <span class="font-bold">Campus L&amp;F bot</span> on Telegram and send this command to link your account:</p>
+                                                <div class="bg-white border border-amber-200 rounded-lg px-3 py-2 font-mono text-sm text-indigo-700 font-bold tracking-wide select-all">/link {{ userProfile.matric }}</div>
+                                                <p class="text-xs text-amber-600">Once linked, you will receive instant match alerts whenever our AI finds a potential match for your lost item.</p>
                                             </div>
                                         </div>
 

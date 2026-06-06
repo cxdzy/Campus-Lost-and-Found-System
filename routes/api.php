@@ -17,3 +17,4 @@ Route::middleware('auth')->group(function () {
 
 Route::post('/bot/submit', [BotSubmissionController::class, 'store']);
 Route::post('/bot/update-location', [BotSubmissionController::class, 'updateLocation']);
+Route::post('/bot/link-account', [BotSubmissionController::class, 'linkAccount']);

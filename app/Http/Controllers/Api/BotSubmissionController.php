@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Finder;
 use App\Models\FoundItem;
 use App\Models\Item;
+use App\Models\Loser;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -161,6 +162,30 @@ class BotSubmissionController extends Controller
         ProcessVisionTagsJob::dispatch($item->id);
 
         return response()->json(['message' => 'Location updated and processing started.', 'id' => $item->id]);
+    }
+
+    public function linkAccount(Request $request): JsonResponse
+    {
+        if ($deny = $this->authorizeBot($request)) {
+            return $deny;
+        }
+
+        $validated = $request->validate([
+            'matric_number'    => ['required', 'string', 'max:20'],
+            'telegram_chat_id' => ['required', 'string', 'max:255'],
+        ]);
+
+        $loser = Loser::where('matric_number', $validated['matric_number'])
+                      ->with('user')
+                      ->first();
+
+        if (!$loser) {
+            return response()->json(['message' => 'No account found for that matric number.'], 404);
+        }
+
+        $loser->user->update(['telegram_chat_id' => $validated['telegram_chat_id']]);
+
+        return response()->json(['message' => 'Telegram account linked successfully.']);
     }
 
     private function detectExtension(?string $contentType, string $body): string

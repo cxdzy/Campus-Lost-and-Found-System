@@ -355,6 +355,11 @@ MATCH_CONFIDENCE_THRESHOLD=0.80
 - Nginx upload limit patched by `deploy.sh` on every deploy (idempotent `grep` check).
 - **To run artisan on production:** Dokploy → Laravel service → Open Terminal → `cd /app && php artisan <command>`.
 
+- **Persistent storage:** `campus-lf-storage` Docker named volume mounted to `/app/storage`. 
+  Auto-mounted by `scripts/deploy.sh` using `DOKPLOY_SERVICE_NAME` env var. 
+  Files live at `/var/lib/docker/volumes/campus-lf-storage/_data/`.
+  After any manual container restart run `php artisan storage:link`.
+
 ---
 
 ## 13. Glossary
