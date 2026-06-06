@@ -87,4 +87,28 @@ if command -v systemctl >/dev/null 2>&1; then
   sudo systemctl reload nginx 2>/dev/null || true
 fi
 
+# ── Persistent storage volume (Docker Swarm) ──────────────────────────────────
+# Mount campus-lf-storage → /app/storage so uploaded images survive redeployments.
+# Requires DOKPLOY_SERVICE_NAME to be set in the Dokploy environment variables.
+# Idempotent: skips the service update when the volume mount is already configured.
+if command -v docker >/dev/null 2>&1; then
+  DOCKER_SVC="${DOKPLOY_SERVICE_NAME:-}"
+  if [ -z "$DOCKER_SVC" ]; then
+    echo "DOKPLOY_SERVICE_NAME not set — skipping volume mount step"
+  else
+    docker volume create campus-lf-storage 2>/dev/null || true
+    if docker service inspect "$DOCKER_SVC" 2>/dev/null | grep -q '"campus-lf-storage"'; then
+      echo "campus-lf-storage already mounted on $DOCKER_SVC — skipping"
+    else
+      echo "Mounting campus-lf-storage → /app/storage on service $DOCKER_SVC"
+      docker service update \
+        --mount-add type=volume,source=campus-lf-storage,target=/app/storage \
+        --detach \
+        "$DOCKER_SVC" || true
+    fi
+  fi
+else
+  echo "docker CLI not available — skipping volume mount step"
+fi
+
 echo "Deploy complete"

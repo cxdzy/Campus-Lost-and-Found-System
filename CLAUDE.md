@@ -19,7 +19,7 @@ only when the confidence score exceeds the configured threshold (default 80%).
 - **Course context:** ITT626 — Back-End Technology
 - **Deployment:** Self-hosted VPS managed with **Dokploy** — Laravel app, Node.js bot, and
   PostgreSQL each run as separate Dokploy services
-- **Primary frontends:** Telegram Bot (Node.js/Telegraf) + Vue.js SPA via Inertia.js (web)
+- **Primary frontends:** Telegram Bot (Node.js/Telegraf, separate GitHub repo) + Vue.js SPA via Inertia.js (web)
 
 ---
 
@@ -29,17 +29,15 @@ only when the confidence score exceeds the configured threshold (default 80%).
 |-------|-----------|
 | Back-end API | Laravel (PHP) |
 | Web frontend | Vue.js SPA via **Inertia.js** |
-| Telegram Bot | **Separate Node.js service** using **Telegraf** — own Dokploy service, own process |
+| Telegram Bot | **Separate Node.js service** using **Telegraf** — own Dokploy service, own GitHub repo (`Campus-Lost-and-Found-System-Bot`) |
 | Vision tagging | **OpenCV** target — currently `MockCloudVisionService` (random tags + ApiLog) |
 | Geolocation | Raw GPS lat/long — Haversine in `MatchingService`; map UI uses **Leaflet/OSM** |
 | Database | **PostgreSQL** (Dokploy service) |
 | Hosting / deploy | **VPS + Dokploy** — three separate services: Laravel, Node.js bot, Postgres |
 
 > **Critical architecture boundary:** The Telegram bot (`bot.js`) is a **completely separate
-> Node.js process**. It communicates with Laravel only by calling Laravel's HTTP API routes.
-> It does NOT share PHP code, sessions, or a direct DB connection. Every feature that spans
-> both the bot and Laravel must go through an API call (bot → POST Laravel endpoint).
-> Never mix Node.js and PHP logic. Keep this boundary explicit in all new code.
+> Node.js process in its own GitHub repo**. It communicates with Laravel only via HTTP API calls.
+> It does NOT share PHP code, sessions, or a direct DB connection. Never mix Node.js and PHP logic.
 
 When adding Laravel code: Eloquent models, Form Requests for validation, service classes for
 integrations, queued jobs for slow work (vision, notifications), route-model binding.
@@ -48,71 +46,96 @@ integrations, queued jobs for slow work (vision, notifications), route-model bin
 
 ## 3. Architecture & Workflows
 
-### Found workflow (Telegram bot → Laravel API)
+### Found workflow (Telegram bot → Laravel API) ✅ FULLY WORKING
 
-Current actual state:
-1. Finder sends `/found` to bot.
-2. Bot sets `userSessions[userId] = { step: 'AWAITING_PHOTO' }` (in-memory).
-3. Finder uploads a photo with a caption.
-4. Bot calls `ctx.telegram.getFileLink()` to get the image URL — then **stops** (`(coming soon)`).
-5. ❌ Bot does NOT yet call the Laravel API (`BotSubmissionController` exists but is unreached).
-6. ❌ No GPS step exists in the bot yet.
+1. Finder sends `/found` to bot → bot shows category inline keyboard (10 categories).
+2. Finder selects a category → bot prompts for photo.
+3. Finder uploads photo with caption → bot POSTs to `POST /api/bot/submit` with
+   `{telegram_chat_id, image_url, caption, category_id}`.
+4. Laravel `BotSubmissionController@store`:
+   - Finds or creates `User` + `Finder` from `telegram_chat_id` (inside DB transaction)
+   - Downloads and stores image to VPS
+   - Creates `Item` + `FoundItem` records
+   - Dispatches `ProcessVisionTagsJob` after commit
+5. Bot receives `{id}` response → stores `found_item_id` in session → asks for GPS.
+6. Finder shares location → bot POSTs to `POST /api/bot/update-location` with
+   `{found_item_id, latitude, longitude}`.
+7. Laravel updates Item coordinates → job runs `MockCloudVisionService` → saves `AiTag` records.
+8. `MatchingService` runs → if score > threshold → fires Telegram alert to loser via `TelegramService`.
 
-Target state (what needs to be built):
-1. After photo received → bot calls `POST /api/bot/found` on Laravel with `{telegram_chat_id, image_url, caption}`.
-2. Bot then asks for GPS location share.
-3. After GPS received → bot calls `POST /api/bot/found/{id}/location` with `{latitude, longitude}`.
-4. Laravel queues a vision job → runs MockCloudVisionService (or real OpenCV) → saves AI_TAGS.
-5. Laravel runs MatchingService → if score > threshold, fires Telegram alert to loser.
+### Lost workflow (Web SPA → Laravel) ✅ FULLY WORKING
 
-### Lost workflow (Web SPA → Laravel)
+1. User logs in via Matric Number + password.
+2. Fills "Report Lost Item" form — title, category, distinctive features, optional reference photo.
+3. Drops a Leaflet/OSM pin for last-known location → lat/long stored.
+4. Submits → Laravel creates `Item` + `LostItem` → `MatchingService` runs synchronously.
 
-Working. User registers via Inertia web form, drops a Leaflet pin, submits to Laravel.
-Known bug: `fetchGalleryItems()` is called after successful report submission in
-`Dashboard.vue:295` but the function is never defined → **runtime crash on the happy path**.
+### Matching & resolution ✅ WORKING
 
-### Matching & resolution
+- `MatchingService`: Haversine distance + tag overlap → composite score.
+- Threshold read from `config('matching.threshold')` → env `MATCH_CONFIDENCE_THRESHOLD` (default 0.80).
+- Score > threshold → writes `MatchAlert` row → `TelegramService::sendMessage()` notifies loser.
+- Admin sees match in **Match Alerts** dashboard → clicks "Verify & Notify" → OTP generated in
+  `reownership_claims` with `expires_at` 5 min → sent to student via Telegram.
+- Student presents OTP at security desk → staff verifies → item marked `Claimed`.
 
-`MatchingService` exists and works: Haversine distance + tag overlap → composite score.
-Threshold is **hardcoded at `0.80` (line 16)** — must be moved to config.
-Telegram dispatch is wired inside `MatchingService` but calls `Http::` directly — no `TelegramService` class exists yet.
+### Bot → Laravel API contract
+
+```
+POST /api/bot/submit
+Headers: X-Bot-Secret: <LARAVEL_BOT_SECRET>
+Body: { telegram_chat_id, image_url, caption, category_id }
+Response: { id: found_item_id }
+
+POST /api/bot/update-location
+Headers: X-Bot-Secret: <LARAVEL_BOT_SECRET>
+Body: { found_item_id, latitude, longitude }
+Response: { status: 'ok' }
+```
+
+Both endpoints require the `X-Bot-Secret` header — checked against `config('services.bot.secret')`.
 
 ---
 
 ## 4. Modules
 
-### 4.1 Finder Module (Telegram Bot — Node.js)
-- `/found` command, photo + caption capture, `/cancel` escape hatch.
-- **Missing:** GPS step, HTTP call to Laravel API, session persistence across bot restarts.
+### 4.1 Finder Module (Telegram Bot — Node.js, separate repo) ✅
+- `/found` → category inline keyboard → photo + caption → GPS location → complete
+- `/cancel` escape hatch at any step
+- Auto creates `User` + `Finder` record on first submission
+- Bot runs on Dokploy, auto-deploys from `Campus-Lost-and-Found-System-Bot` repo
 
-### 4.2 Loser / User Module (Web SPA — Inertia + Vue)
-- Auth via Matric Number, lost-item form, Leaflet map pin, My Reports tracking.
-- **Bug:** `fetchGalleryItems` undefined crash after report submission.
+### 4.2 Loser / User Module (Web SPA — Inertia + Vue) ✅
+- Auth via Matric Number, lost-item form, Leaflet map pin, My Reports tracking
+- Alert badge shows real unread `match_alerts` count (`is_notified = false`)
+- "Generate Claim OTP" triggers OTP creation and Telegram notification
 
-### 4.3 Administrator & Security Module (Web Dashboard)
-- Inventory list (Found items), basic Reports, Users management.
-- **Missing:** Match Alerts UI (side-by-side comparison, "Verify & Notify", OTP handover).
+### 4.3 Administrator & Security Module (Web Dashboard) ✅
+- Inventory list — Found items with photo, GPS, status badges, Audit Details modal
+- Match Alerts — side-by-side Lost vs Found comparison, match score, "Verify & Notify"
+- API Logs — real-time OpenCV/Telegram transaction monitoring
+- Users management, Reports
 
 ---
 
-## 5. Database Schema (from ERD — all migrations exist)
+## 5. Database Schema (all migrations exist and have run)
 
-### Core (all tables created)
-- **users**: `id`, `name`, `role` enum(`Admin`,`Security`,`User`), timestamps
+### Core
+- **users**: `id`, `name`, `role` enum(`Admin`,`Security`,`User`), `telegram_chat_id`, `matric_number`, timestamps
 - **finders**: `user_id` PK+FK→users, `telegram_chat_id`
 - **losers**: `user_id` PK+FK→users, `matric_number`
-- **categories**: `id`, `category_name`, `icon_identifier`
+- **categories**: `id`, `category_name`, `icon_identifier` — 10 categories seeded (id 1=Others through id 10=Stationery)
 - **items**: `id`, `category_id` FK, `title_description`, `latitude`, `longitude`, `location_name`, `status` enum(`Pending`,`Matched`,`Claimed`)
 - **found_items**: `item_id` PK+FK→items, `finder_id` FK→finders, `image_path`
-- **lost_items**: `item_id` PK+FK→items, `loser_id` FK→losers, `image_path` (added via later migration)
+- **lost_items**: `item_id` PK+FK→items, `loser_id` FK→losers, `image_path`
 
-### AI & Logic (all tables created)
+### AI & Logic
 - **ai_tags**: `id`, `found_item_id` FK, `tag_name`, `confidence_level` float
 - **match_alerts**: `id`, `lost_item_id` FK, `found_item_id` FK, `match_score` float, `is_notified` bool
 
-### Security & Monitoring (all tables created)
-- **reownership_claims**: `id`, `found_item_id` FK, `loser_id` FK, `security_guard_id` FK, `otp_code`, `claimed_at`
-- **api_logs**: `id`, `item_id` FK, `service` string, `http_status_code` int, `payload_response` text, `logged_at`
+### Security & Monitoring
+- **reownership_claims**: `id`, `found_item_id` FK, `loser_id` FK, `security_guard_id` FK, `otp_code`, `expires_at` timestamp, `claimed_at`
+- **api_logs**: `id`, `item_id` FK nullable, `service` string, `http_status_code` int, `payload_response` text, `logged_at`
 
 ---
 
@@ -120,81 +143,69 @@ Telegram dispatch is wired inside `MatchingService` but calls `Http::` directly 
 
 ### Models (all exist)
 `User`, `Finder`, `Loser`, `Item`, `FoundItem`, `LostItem`, `Category`, `AiTag`,
-`MatchAlert`, `Claim` (table: `reownership_claims`), `ReownershipClaim`, `ApiLog`
+`MatchAlert`, `Claim` / `ReownershipClaim` (table: `reownership_claims`), `ApiLog`
 
 TPT pattern: derived models set `$primaryKey = 'item_id'` (or `user_id`) and
 `$incrementing = false`. Follow this on any new derived model.
 
-### Services
-- `MatchingService` — Haversine + tag-overlap scoring + Telegram dispatch via `Http::`. ✅
-- `MockCloudVisionService` — random tags + ApiLog entry. ✅ (real OpenCV integration missing)
-- `TelegramService` — ❌ **does not exist.** `MatchingService` and `BotSubmissionController`
-  call `Http::` directly. Must be created.
+### Services (all exist)
+- `MatchingService` — Haversine + tag-overlap scoring, dispatches via `TelegramService` ✅
+- `MockCloudVisionService` — random tags + ApiLog entry ✅
+- `TelegramService` — `sendMessage(chatId, text, ?itemId, redactPayload)`, logs to ApiLog ✅
 
-### Controllers
-- `BotSubmissionController` — Laravel-side endpoint for bot → Laravel calls. ✅ exists, ❌ bot doesn't call it yet.
-- `ItemController` — full CRUD. ✅
+### Controllers (all exist)
+- `BotSubmissionController` — `store()` + `updateLocation()`, both gated by `X-Bot-Secret` ✅
+- `ItemController` — full CRUD, dispatches `ProcessVisionTagsJob` for Found items ✅
 - `CategoryController` ✅
+- `Admin\MatchAlertsController` — `index()` + `verify()` (OTP generation + Telegram send) ✅
 - `DashboardController`, `ReportsController`, `UsersController`, `AuthenticatedSessionController` ✅
-- Standard Laravel Breeze auth controllers ✅
 
 ### Middleware
-- `EnsureUserRole` — RBAC, gates Admin/Security routes. ✅
+- `EnsureUserRole` — RBAC, gates Admin/Security routes ✅
 - `HandleInertiaRequests` ✅
 
-### Form Requests
-`StoreReportRequest`, `UpdateReportRequest`, `StoreUserRequest`, `UpdateUserRequest`,
-`LoginRequest`, `ProfileUpdateRequest` — all exist.
+### Form Requests (all exist)
+`StoreReportRequest` (20MB image limit), `UpdateReportRequest`, `StoreUserRequest`,
+`UpdateUserRequest`, `LoginRequest`, `ProfileUpdateRequest`
 
-### Vue Pages
-Full student `Dashboard` (gallery + Leaflet form + my-reports + settings),
-admin dashboard/reports/users, all auth pages — all exist.
+### Jobs
+- `ProcessVisionTagsJob` — 3 retries, runs `MockCloudVisionService` then `MatchingService` ✅
 
-### Queue Jobs
-❌ **`app/Jobs/` directory does not exist.** Vision and matching run synchronously
-inside the HTTP request. This must be fixed before real OpenCV is added.
+### Vue Pages (all exist)
+- Student: `Dashboard` (gallery + Leaflet report form + my-reports + settings + map modal)
+- Admin: `Admin/Dashboard`, `Admin/MatchAlerts`, `Admin/Reports`, `Admin/Users`
+- Auth: all standard pages
 
 ---
 
-## 7. Known Bugs & Missing Pieces
+## 7. Known Issues & Remaining Work
 
-### 🔴 P1 — Crash
-1. ~~**`fetchGalleryItems` undefined**~~ ✅ Fixed — defined at `Dashboard.vue:173`
+### ✅ All P1/P2/P3 items resolved
 
-### 🟡 P2 — CLAUDE.md violations
-2. ~~**Hardcoded threshold**~~ ✅ Fixed — `config/matching.php` reads `MATCH_CONFIDENCE_THRESHOLD`
-3. ~~**No TelegramService**~~ ✅ Fixed — `app/Services/TelegramService.php`
-4. **`.env.example` gaps** — Missing full Postgres block and `LARAVEL_BOT_SECRET`
-
-### 🟠 P3 — Core missing features
-5. ~~**Bot → Laravel integration**~~ ✅ Fixed
-6. ~~**GPS step in bot**~~ ✅ Fixed
-7. ~~**Queue job for vision**~~ ✅ Fixed — `app/Jobs/ProcessVisionTagsJob.php`, dispatched
-   from `BotSubmissionController` and `ItemController` after commit. Worker runs permanently
-   in Dokploy via Advanced → Run Command.
-8. ~~**Admin Match Alerts UI**~~ ✅ Fixed — `Admin/MatchAlerts.vue` + 
-   `MatchAlertsController`, OTP via `TelegramService` with redacted payload log,
-   `expires_at` on `reownership_claims`
-
-### ⚪ P4 — UI polish
-9. **"View on Map" button** — `Dashboard.vue:441` exists but does nothing
-10. **"1 Alert" badge** — `Dashboard.vue:397` hardcoded, not driven by real data
-11. **Map modal shows max 20 items** — capped by SSR gallery query. 
+### ⚪ P4 — UI polish (low priority)
+11. **Map modal shows max 20 items** — capped by SSR gallery query.
     Fix later: separate paginated endpoint for map pins.
-12. **Popup z-index inside Leaflet DOM** — may clip on some browsers. 
-    Fix: render popup outside LMap element.
-    
+12. **Popup z-index inside Leaflet DOM** — may clip on some browsers.
+    Fix: render popup outside `<LMap>` element.
+
+### 🔵 P5 — Future (blocked on external dependency)
+13. **Real OpenCV integration** — swap `MockCloudVisionService` for real HTTP call to OpenCV
+    microservice inside `ProcessVisionTagsJob`. Everything else (ApiLog, MatchingService,
+    queue) stays the same — single class swap when microservice is ready.
+
+---
 
 ## 8. Existing Code Patterns to Follow
 
 Before writing any new file, read an existing file of the same type and match its structure exactly.
 
-- **TPT Model:** `app/Models/FoundItem.php` — `$primaryKey`, `$incrementing`, `$fillable`, relationships
-- **Service class:** `app/Services/MatchingService.php` — constructor injection, no static methods
-- **Controller:** `app/Http/Controllers/ItemController.php` — DB transaction pattern, JSON responses
+- **TPT Model:** `app/Models/FoundItem.php`
+- **Service class:** `app/Services/TelegramService.php` — constructor injection, logs to ApiLog
+- **Controller:** `app/Http/Controllers/Api/BotSubmissionController.php` — transaction pattern, bot secret guard
+- **Admin Controller:** `app/Http/Controllers/Admin/MatchAlertsController.php`
 - **Form Request:** `app/Http/Requests/StoreReportRequest.php`
 - **Migration:** any file in `database/migrations/` — Postgres-compatible types only
-- **Vue page:** `resources/js/Pages/Dashboard.vue` — Inertia props, Leaflet usage, Tailwind classes
+- **Vue page:** `resources/js/Pages/Dashboard.vue` — Inertia props, Leaflet, Tailwind
 
 ### DB transaction pattern (always use for multi-table writes)
 ```php
@@ -209,19 +220,25 @@ try {
 }
 ```
 
-### JSON response pattern
+### Bot secret guard pattern (use in all bot-facing endpoints)
 ```php
-return response()->json(['data' => $resource], 201);   // created
-return response()->json($paginated);                    // paginated list
+private function authorizeBot(): ?JsonResponse
+{
+    $secret = config('services.bot.secret');
+    if ($secret && request()->header('X-Bot-Secret') !== $secret) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+    return null;
+}
 ```
 
-### API_LOGS pattern (log every external service call)
+### ApiLog pattern (log every external service call)
 ```php
 ApiLog::create([
-    'item_id'          => $item->id,
-    'service'          => 'OpenCV',   // or 'Telegram'
+    'item_id'          => $item->id,   // nullable for non-item calls
+    'service'          => 'OpenCV',    // or 'Telegram'
     'http_status_code' => $statusCode,
-    'payload_response' => json_encode($response),
+    'payload_response' => $redact ? '[REDACTED]' : json_encode($response),
     'logged_at'        => now(),
 ]);
 ```
@@ -230,65 +247,60 @@ ApiLog::create([
 
 ## 9. Conventions & Guardrails
 
-- **Never hard-code secrets.** Bot token, DB credentials, threshold → `.env` and Dokploy env vars.
-- **Threshold must be configurable.** Read from `config('lostfound.match_threshold')` everywhere.
-  Admins adjust it via the dashboard (no code redeploy needed).
-- **TelegramService is the only way to send Telegram messages.** Never call `Http::post` to
-  Telegram directly from controllers or other services.
-- **Queue all slow work.** Vision analysis and matching must run in jobs, not in the HTTP request.
+- **Never hard-code secrets.** Bot token, DB credentials, threshold → `.env` + Dokploy env vars.
+- **Threshold:** read from `config('matching.threshold')` everywhere. Never `0.80` as a literal.
+- **Telegram messages:** only via `TelegramService::sendMessage()`. Never bare `Http::post` to Telegram.
+- **Bot secret:** all bot-facing endpoints must call `authorizeBot()`. Secret in `config('services.bot.secret')`.
+- **Queue all slow work.** Vision and matching run in `ProcessVisionTagsJob`, not in HTTP requests.
 - **Every external service call gets an ApiLog row.** No exceptions.
-- **RBAC via `EnsureUserRole` middleware.** Never inline role checks in controllers.
-- **OTPs are single-use and time-limited.** Invalidate on first use; add `expires_at` column.
-- **Bot ↔ Laravel boundary.** Bot is Node.js. Laravel is PHP. Communication is HTTP only.
-  Do not suggest merging them or sharing a DB connection from Node.js.
-- **Postgres only.** No MySQL syntax. Use `string` + check constraints for enums, `float` for
-  coordinates, `jsonb` for arbitrary payloads.
-- **Inertia for web routes, JSON for API routes.** Don't mix them.
+- **RBAC:** `EnsureUserRole` middleware only. Never inline role checks in controllers.
+- **OTPs:** single-use, `expires_at` enforced, never logged in plaintext to ApiLog.
+- **Bot ↔ Laravel boundary:** HTTP only. No shared DB connection from Node.js.
+- **Postgres only.** No MySQL syntax. `float` for coordinates, `jsonb` for payloads.
+- **Inertia for web routes, JSON for API routes.** Never mix.
+- **Upload limit:** 20MB enforced at three layers — `public/.user.ini`, `docker/nginx-upload.conf`, `StoreReportRequest`.
 
 ---
 
-## 10. Bot Architecture Detail (Node.js — `bot.js`)
+## 10. Bot Architecture (separate repo: `Campus-Lost-and-Found-System-Bot`)
 
-The Telegram bot is a standalone Node.js application using **Telegraf**. It runs as its own
-Dokploy service on the VPS.
-
-### Current bot state
-- `/found` → sets in-memory session `{ step: 'AWAITING_PHOTO' }` ✅
-- `/cancel` → clears session ✅
-- Photo handler → gets file link, logs to console → **stops here** (`coming soon`) ⚠️
-- Text fallback → nudges user to use `/found` ✅
-- ❌ No GPS collection step
-- ❌ No HTTP call to Laravel API
-- ❌ In-memory sessions lost on bot restart (use Redis or DB for persistence later)
-
-### Bot → Laravel API contract (to be built)
-The bot must POST to these Laravel endpoints:
-
+### Bot flow (fully working)
 ```
-POST /api/bot/found
-Body: { telegram_chat_id, image_url, caption, telegram_user_id }
-Response: { found_item_id }   ← bot stores this in session for GPS step
-
-POST /api/bot/found/{found_item_id}/location
-Body: { latitude, longitude }
-Response: { status: 'processing' }
+/found
+  → inline keyboard: 10 category buttons (2 per row)
+  → user taps category → session: { step: AWAITING_PHOTO, category_id }
+  → bot asks for photo
+  → user uploads photo + caption
+  → bot POSTs to Laravel /api/bot/submit
+  → session: { step: AWAITING_LOCATION, found_item_id }
+  → bot asks for GPS location
+  → user shares location
+  → bot POSTs to Laravel /api/bot/update-location
+  → bot replies: "Thank you! 🎉"
 ```
 
-These routes are handled by `BotSubmissionController` in Laravel (already exists).
+### Bot categories (hardcoded — matches DB)
+```javascript
+const CATEGORIES = [
+    { id: 2, name: 'Electronics' }, { id: 3, name: 'Wallets' },
+    { id: 4, name: 'Keys' },        { id: 5, name: 'IDs' },
+    { id: 6, name: 'Accessories' }, { id: 7, name: 'Bags & Backpacks' },
+    { id: 8, name: 'Clothing' },    { id: 9, name: 'Books' },
+    { id: 10, name: 'Stationery' }, { id: 1, name: 'Others' },
+];
+```
 
-### Bot `.env` variables needed
+> `GET /api/categories` exists if you want to switch to dynamic loading later.
+
+### Bot `.env` (in bot repo, not committed)
 ```env
-TELEGRAM_BOT_TOKEN=your_token_here
-LARAVEL_API_URL=http://laravel-service-name/api   # internal Dokploy network URL
-LARAVEL_BOT_SECRET=a_shared_secret_for_auth       # so Laravel knows the call is from the bot
+TELEGRAM_BOT_TOKEN=...
+LARAVEL_APP_URL=https://your-domain.com
+LARAVEL_BOT_SECRET=...   # must match Laravel's LARAVEL_BOT_SECRET exactly
 ```
 
-### Starting the bot
-```bash
-cd bot/          # or wherever bot.js lives
-npm install
-node bot.js      # or: pm2 start bot.js (if using pm2 on the VPS)
-```
+### Known limitation
+- In-memory sessions (`userSessions` object) — lost on bot restart. Use Redis for persistence later.
 
 ---
 
@@ -296,61 +308,52 @@ node bot.js      # or: pm2 start bot.js (if using pm2 on the VPS)
 
 ```bash
 # Laravel setup
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate --seed
+composer install && cp .env.example .env
+php artisan key:generate && php artisan migrate --seed
 
-# Laravel run (local dev)
-php artisan serve              # web server
-php artisan queue:work         # job worker (vision + matching)
-npm run dev                    # Vue/Inertia SPA build
+# Laravel local dev
+php artisan serve          # web server
+php artisan queue:work     # job worker (vision + matching)
+npm run dev                # Vue/Inertia SPA
 
-# Bot run (local dev)
-cd bot && node bot.js
+# Artisan on production (Dokploy terminal → cd /app)
+php artisan migrate --force
+php artisan tinker
 
 # Code quality
-php artisan test
-./vendor/bin/pint
+php artisan test && ./vendor/bin/pint
 ```
 
-### `.env` required variables (Postgres + Dokploy)
-
+### `.env` required variables
 ```env
 DB_CONNECTION=pgsql
-DB_HOST=postgres-service-name   # Dokploy internal service name, not localhost
+DB_HOST=postgres-service-name   # Dokploy internal name, not localhost
 DB_PORT=5432
 DB_DATABASE=lostfound
 DB_USERNAME=postgres
 DB_PASSWORD=...
 
 TELEGRAM_BOT_TOKEN=...
-LARAVEL_BOT_SECRET=...          # shared secret bot uses when calling Laravel API
-MATCH_CONFIDENCE_THRESHOLD=0.80 # float, read by config/lostfound.php
+LARAVEL_BOT_SECRET=...
+LARAVEL_APP_URL=https://your-domain.com
+MATCH_CONFIDENCE_THRESHOLD=0.80
 ```
 
 ---
 
 ## 12. Deployment (VPS + Dokploy — 3 services)
 
-Three separate Dokploy services:
-1. **Laravel app** — PHP web process + queue worker process
-2. **Node.js bot** — `node bot.js`, long-running
-3. **PostgreSQL** — managed by Dokploy, internal network only
+| Service | Repo | Start command |
+|---------|------|---------------|
+| Laravel app | `Campus-Lost-and-Found-System` | `/bin/sh -c 'php artisan migrate --force && php artisan config:cache && php artisan queue:work --sleep=3 --tries=3 --max-time=3600 & php-fpm'` |
+| Node.js bot | `Campus-Lost-and-Found-System-Bot` | `npm start` (runs `node --dns-result-order=ipv4first bot.js`) |
+| PostgreSQL | Dokploy managed | — |
 
-All secrets go in **Dokploy environment variables**, never in the repo.
-
-Laravel deploy steps: `composer install --no-dev` → `php artisan migrate --force` →
-`php artisan config:cache` → `php artisan queue:restart`.
-
-The queue worker must be a **long-lived process** in Dokploy — not a one-off command.
-Without it, dispatched vision and matching jobs sit in the queue forever.
-
-Bot deploy steps: `npm install --production` → `node bot.js`.
-
-The bot and Laravel communicate over the **Dokploy internal network** using service names as
-hostnames. Use the service name (e.g. `laravel-app`) as `LARAVEL_API_URL` in the bot's env,
-not a public domain, so traffic stays internal and fast.
+- All secrets in **Dokploy environment variables**, never in the repo.
+- Migrations run automatically on every Laravel deploy (`migrate --force` in start command).
+- Queue worker runs permanently in the same container as the web process (background `&`).
+- Nginx upload limit patched by `deploy.sh` on every deploy (idempotent `grep` check).
+- **To run artisan on production:** Dokploy → Laravel service → Open Terminal → `cd /app && php artisan <command>`.
 
 ---
 
@@ -360,6 +363,7 @@ not a public domain, so traffic stays internal and fast.
 - **Loser / User** — student who reports a lost item via the web SPA.
 - **Match Alert** — automated notification fired when composite score > configured threshold.
 - **OTP Handover** — claim flow: student presents a one-time code to security to verify ownership.
-- **Confidence Threshold** — admin-adjustable float (default 0.80) read from `config/lostfound.php`.
-- **TPT** — Table-Per-Type inheritance: `FoundItem` and `LostItem` share the `items` base table via FK.
+- **Confidence Threshold** — admin-adjustable float (default 0.80) read from `config('matching.threshold')`.
+- **TPT** — Table-Per-Type: `FoundItem`/`LostItem` share the `items` base table via FK.
 - **Bot boundary** — the HTTP API layer separating the Node.js bot from the PHP Laravel backend.
+- **MockCloudVisionService** — placeholder for real OpenCV; generates random tags + ApiLog entry.
