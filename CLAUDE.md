@@ -91,6 +91,11 @@ POST /api/bot/update-location
 Headers: X-Bot-Secret: <LARAVEL_BOT_SECRET>
 Body: { found_item_id, latitude, longitude }
 Response: { status: 'ok' }
+
+POST /api/bot/link-account
+Headers: X-Bot-Secret: <LARAVEL_BOT_SECRET>
+Body: { matric_number, telegram_chat_id }
+Response: { message: 'Account linked successfully' }
 ```
 
 Both endpoints require the `X-Bot-Secret` header — checked against `config('services.bot.secret')`.
@@ -104,6 +109,7 @@ Both endpoints require the `X-Bot-Secret` header — checked against `config('se
 - `/cancel` escape hatch at any step
 - Auto creates `User` + `Finder` record on first submission
 - Bot runs on Dokploy, auto-deploys from `Campus-Lost-and-Found-System-Bot` repo
+- `/link MATRIC_NUMBER` → links web account to Telegram for match alert delivery
 
 ### 4.2 Loser / User Module (Web SPA — Inertia + Vue) ✅
 - Auth via Matric Number, lost-item form, Leaflet map pin, My Reports tracking
@@ -277,6 +283,10 @@ ApiLog::create([
   → user shares location
   → bot POSTs to Laravel /api/bot/update-location
   → bot replies: "Thank you! 🎉"
+  /link MATRIC_NUMBER
+  → bot POSTs to Laravel /api/bot/link-account
+  → Laravel finds Loser by matric_number → updates telegram_chat_id
+  → bot replies: "✅ Your Telegram account is now linked"
 ```
 
 ### Bot categories (hardcoded — matches DB)
@@ -359,6 +369,12 @@ MATCH_CONFIDENCE_THRESHOLD=0.80
   Auto-mounted by `scripts/deploy.sh` using `DOKPLOY_SERVICE_NAME` env var. 
   Files live at `/var/lib/docker/volumes/campus-lf-storage/_data/`.
   After any manual container restart run `php artisan storage:link`.
+
+  - **Swarm image rollout:** `deploy.sh` runs `docker service update --force` after every 
+  rebuild so Swarm always picks up the new image. Without this, Swarm may keep running 
+  the old container despite a successful rebuild (Docker Swarm `:latest` tag limitation).
+- `DOKPLOY_SERVICE_NAME` env var must be set in Dokploy to the Swarm service name 
+  (e.g. `campus-lost-and-found-cxdzy-zpbakj`).
 
 ---
 
