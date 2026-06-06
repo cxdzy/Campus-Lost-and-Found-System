@@ -111,4 +111,10 @@ else
   echo "docker CLI not available — skipping volume mount step"
 fi
 
+# Force Swarm to redeploy with the new image after every Dokploy rebuild.
+if command -v docker >/dev/null 2>&1; then
+  echo "Forcing service update to pick up new image"
+  docker service update --force --detach campus-lost-and-found-cxdzy-zpbakj || true
+fi
+
 echo "Deploy complete"
