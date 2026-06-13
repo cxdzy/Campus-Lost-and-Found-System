@@ -3,8 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiTag;
+use App\Models\ApiLog;
 use App\Models\Item;
+use App\Models\MatchAlert;
+use App\Models\ReownershipClaim;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -55,5 +61,36 @@ class DashboardController extends Controller
         return Inertia::render('Admin/AdminDashboard', [
             'items' => $items,
         ]);
+    }
+
+    public function destroy(Item $item): JsonResponse
+    {
+        // Only found items appear in the admin inventory
+        if (!$item->foundItem) {
+            return response()->json(['error' => 'Item not found in inventory.'], 404);
+        }
+
+        $imagePath = $item->foundItem->image_path;
+
+        DB::beginTransaction();
+        try {
+            AiTag::where('found_item_id', $item->id)->delete();
+            ReownershipClaim::where('found_item_id', $item->id)->delete();
+            MatchAlert::where('found_item_id', $item->id)->delete();
+            ApiLog::where('item_id', $item->id)->delete();
+            $item->foundItem->delete();
+            $item->delete();
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+        // Remove image file after commit so a rollback keeps the file intact
+        if ($imagePath && !Str::startsWith($imagePath, ['http://', 'https://'])) {
+            Storage::disk('public')->delete($imagePath);
+        }
+
+        return response()->json(['message' => 'Item deleted.'], 200);
     }
 }

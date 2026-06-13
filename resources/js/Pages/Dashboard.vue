@@ -362,8 +362,17 @@ const saveSettings = () => {
     }, 1000);
 };
 
-const viewItem = (item) => {
-    console.log(`Opening detail view for: ${item.title}`);
+const isItemModalOpen = ref(false);
+const selectedGalleryItem = ref(null);
+
+const openItemModal = (item) => {
+    selectedGalleryItem.value = item;
+    isItemModalOpen.value = true;
+};
+
+const closeItemModal = () => {
+    isItemModalOpen.value = false;
+    selectedGalleryItem.value = null;
 };
 
 
@@ -494,7 +503,7 @@ const pageTitle = computed(() => {
                             No items match your filters yet.
                         </div>
                         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div v-for="item in filteredItems" :key="item.id" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group" @click="viewItem(item)">
+                            <div v-for="item in filteredItems" :key="item.id" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group" @click="openItemModal(item)">
                                 <div class="h-48 bg-gray-100 relative overflow-hidden">
                                     <img :src="item.image" :alt="item.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='/images/placeholder-item.svg';">
                                     <div class="absolute top-3 right-3 bg-white bg-opacity-90 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-bold text-gray-700 uppercase tracking-wide shadow-sm">
@@ -857,6 +866,86 @@ const pageTitle = computed(() => {
             </main>
         </div>
     </div>
+
+    <!-- Found Item detail modal -->
+    <teleport to="body">
+        <transition name="fade">
+            <div v-if="isItemModalOpen && selectedGalleryItem" class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeItemModal"></div>
+
+                <div class="relative z-10 w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden border border-gray-200">
+                    <!-- Header -->
+                    <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-widest text-indigo-500">Found Item</p>
+                            <h3 class="text-2xl font-bold text-gray-900 mt-1 truncate">{{ selectedGalleryItem.title }}</h3>
+                        </div>
+                        <button @click="closeItemModal" class="rounded-full p-2 text-gray-400 hover:text-gray-900 hover:bg-white border border-gray-200 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <div class="p-6 grid gap-6 md:grid-cols-[240px_1fr]">
+                        <!-- Full-size photo -->
+                        <div class="rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 shadow-sm h-56 md:h-full min-h-[220px]">
+                            <img :src="selectedGalleryItem.image" :alt="selectedGalleryItem.title" class="w-full h-full object-cover" onerror="this.src='/images/placeholder-item.svg';">
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- Category badge -->
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Category</p>
+                                <span class="mt-2 inline-block bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">{{ selectedGalleryItem.category }}</span>
+                            </div>
+
+                            <!-- Location name -->
+                            <div class="rounded-2xl bg-gray-50 border border-gray-200 p-4">
+                                <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Location</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 flex items-center">
+                                    <svg class="w-4 h-4 mr-1.5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    {{ selectedGalleryItem.location }}
+                                </p>
+                            </div>
+
+                            <!-- Time found -->
+                            <div class="rounded-2xl bg-gray-50 border border-gray-200 p-4">
+                                <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Time Found</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 flex items-center">
+                                    <svg class="w-4 h-4 mr-1.5 flex-shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    {{ selectedGalleryItem.timeAgo }}
+                                </p>
+                            </div>
+
+                            <!-- Small Leaflet map (only when GPS is available) -->
+                            <div v-if="selectedGalleryItem.lat && selectedGalleryItem.lng">
+                                <p class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">GPS Location</p>
+                                <div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm" style="height: 160px;">
+                                    <LMap
+                                        :zoom="16"
+                                        :center="[selectedGalleryItem.lat, selectedGalleryItem.lng]"
+                                        style="height: 100%; width: 100%;"
+                                        :options="{ zoomControl: false, dragging: false, scrollWheelZoom: false }"
+                                    >
+                                        <LTileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+                                        />
+                                        <LMarker :lat-lng="[selectedGalleryItem.lat, selectedGalleryItem.lng]" />
+                                    </LMap>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 flex justify-end">
+                                <button @click="closeItemModal" class="px-5 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+    </teleport>
 
     <!-- View on Map modal -->
     <teleport to="body">

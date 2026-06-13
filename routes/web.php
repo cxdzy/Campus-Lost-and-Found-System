@@ -164,6 +164,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Protected admin area
     Route::middleware(['auth', \App\Http\Middleware\EnsureUserRole::class.':Admin,Security'])->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+        Route::delete('/items/{item}', [\App\Http\Controllers\Admin\DashboardController::class, 'destroy'])->name('items.destroy');
         Route::get('/reports', [\App\Http\Controllers\Admin\ReportsController::class, 'index'])->name('reports');
         Route::get('/users', [\App\Http\Controllers\Admin\UsersController::class, 'index'])->name('users');
         Route::get('/match-alerts', [\App\Http\Controllers\Admin\MatchAlertsController::class, 'index'])->name('match-alerts');

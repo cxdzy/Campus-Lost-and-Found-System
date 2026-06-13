@@ -54,7 +54,10 @@
                                   </span>
                               </td>
                               <td class="px-6 py-4 whitespace-nowrap text-right">
-                                  <button @click="selectItem(item)" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white transition-all">Audit Details</button>
+                                  <div class="flex items-center justify-end gap-2">
+                                      <button @click="selectItem(item)" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white transition-all">Audit Details</button>
+                                      <button @click="confirmDelete(item)" class="bg-white border border-red-300 text-red-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all">Delete</button>
+                                  </div>
                               </td>
                           </tr>
                       </tbody>
@@ -131,6 +134,34 @@
                     </div>
       <transition name="fade">
           <div v-if="selectedItem" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-all" @click="closeItem"></div>
+      </transition>
+
+      <!-- Delete confirmation modal -->
+      <transition name="fade">
+          <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center px-4">
+              <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="cancelDelete"></div>
+              <div class="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                  <div class="p-6 border-b border-slate-100 bg-red-50 flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                          <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+                      </div>
+                      <div>
+                          <h3 class="text-base font-black text-slate-900">Confirm Deletion</h3>
+                          <p class="text-xs text-slate-500 mt-0.5">This action is permanent and cannot be undone.</p>
+                      </div>
+                  </div>
+                  <div class="p-6">
+                      <p class="text-sm text-slate-700">Are you sure you want to delete item <span class="font-black text-slate-900">#{{ deleteTarget.id }}</span>? This will permanently remove the found item, all AI tags, match alerts, claim records, and associated logs.</p>
+                  </div>
+                  <div class="px-6 pb-6 flex justify-end gap-3">
+                      <button @click="cancelDelete" :disabled="deleteLoading" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 transition-colors disabled:opacity-50">Cancel</button>
+                      <button @click="executeDelete" :disabled="deleteLoading" class="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                          <svg v-if="deleteLoading" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                          <span>{{ deleteLoading ? 'Deleting...' : 'Delete Permanently' }}</span>
+                      </button>
+                  </div>
+              </div>
+          </div>
       </transition>
 
       <transition name="slide">
@@ -290,6 +321,29 @@ const apiLogs = ref([
 
 const selectItem = (item) => selectedItem.value = item;
 const closeItem  = () => selectedItem.value = null;
+
+const deleteTarget  = ref(null);
+const deleteLoading = ref(false);
+
+const confirmDelete = (item) => { deleteTarget.value = item; };
+const cancelDelete  = () => { deleteTarget.value = null; };
+
+const executeDelete = async () => {
+    if (!deleteTarget.value) return;
+    deleteLoading.value = true;
+    try {
+        await window.axios.delete(`/admin/items/${deleteTarget.value.id}`);
+        inventory.value = inventory.value.filter((i) => i.id !== deleteTarget.value.id);
+        if (selectedItem.value?.id === deleteTarget.value.id) closeItem();
+        pushToast('success', 'Item deleted', `Item #${deleteTarget.value.id} has been permanently removed.`);
+    } catch (err) {
+        const msg = err?.response?.data?.error ?? 'Could not delete the item. Please try again.';
+        pushToast('error', 'Delete failed', msg);
+    } finally {
+        deleteLoading.value = false;
+        deleteTarget.value = null;
+    }
+};
 
 // Parse "lat, lng" string from inventory coords into a Leaflet LatLng array
 const selectedItemLatLng = computed(() => {
