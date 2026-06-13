@@ -7,6 +7,7 @@ use App\Models\ApiLog;
 use App\Models\FoundItem;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class VisionService
@@ -21,11 +22,11 @@ class VisionService
             return app(MockCloudVisionService::class)->analyse($foundItem);
         }
 
-        $imageUrl = $this->resolveImageUrl($foundItem->image_path);
+        $imageContent = $this->readImageAsBase64($foundItem->image_path);
 
         $requestBody = [
             'requests' => [[
-                'image'    => ['source' => ['imageUri' => $imageUrl]],
+                'image'    => ['content' => $imageContent],
                 'features' => [['type' => 'LABEL_DETECTION', 'maxResults' => 10]],
             ]],
         ];
@@ -72,17 +73,21 @@ class VisionService
         return $tagRecords;
     }
 
-    private function resolveImageUrl(string $path): string
+    private function readImageAsBase64(string $path): string
     {
+        // Absolute URL — fetch remotely
         if (Str::startsWith($path, ['http://', 'https://'])) {
-            return $path;
+            $bytes = Http::withoutVerifying()->timeout(15)->get($path)->body();
+            return base64_encode($bytes);
         }
 
-        // Prefer STORAGE_PUBLIC_URL (set in Dokploy to the public domain).
-        // Fall back to APP_URL only as a last resort — it may be localhost in some setups.
-        $base = config('services.storage.public_url')
-            ?? config('app.url');
+        // Relative storage path — read directly from disk
+        $bytes = Storage::disk('public')->get($path);
 
-        return rtrim($base, '/') . '/storage/' . ltrim($path, '/');
+        if ($bytes === null) {
+            throw new \RuntimeException("Image not found on storage disk: {$path}");
+        }
+
+        return base64_encode($bytes);
     }
 }
