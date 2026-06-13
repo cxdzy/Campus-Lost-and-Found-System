@@ -161,9 +161,24 @@ const mapReportToCard = (item) => ({
     status: item.status ?? 'Pending',
     timeAgo: formatTimeAgo(item.created_at),
     image: item.image_url ? normalizeImagePath(item.image_url) : null,
+    matchAlertId: item.match_alert_id ?? null,
 });
 
 const reportItems = computed(() => myReports.value.map(mapReportToCard));
+
+const otpLoading = ref({});
+
+const generateOtp = async (item) => {
+    if (!item.matchAlertId) return;
+    otpLoading.value[item.id] = true;
+    try {
+        await window.axios.post(`/dashboard/data/match-alerts/${item.matchAlertId}/request-otp`);
+    } catch (e) {
+        // errors handled in next fix
+    } finally {
+        otpLoading.value[item.id] = false;
+    }
+};
 
 const openReportModal = (item) => {
     selectedReport.value = item;
@@ -675,8 +690,9 @@ const pageTitle = computed(() => {
                                 <p class="mt-2 text-sm text-gray-500">Once you submit a lost report, it will appear here with its current status and alerts.</p>
                             </div>
 
-                            <div v-for="item in reportItems" :key="item.id" :class="['rounded-2xl p-6 shadow-md relative overflow-hidden flex flex-col sm:flex-row gap-6 border', item.status === 'Matched' ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200']">
+                            <div v-for="item in reportItems" :key="item.id" :class="['rounded-2xl p-6 shadow-md relative overflow-hidden flex flex-col sm:flex-row gap-6 border', item.status === 'Matched' ? 'bg-indigo-50 border-indigo-200' : item.status === 'Claimed' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200']">
                                 <div v-if="item.status === 'Matched'" class="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-bl-full -z-10"></div>
+                                <div v-else-if="item.status === 'Claimed'" class="absolute top-0 right-0 w-32 h-32 bg-emerald-100 rounded-bl-full -z-10"></div>
 
                                 <div class="w-full sm:w-48 h-32 flex-shrink-0 rounded-xl overflow-hidden border border-gray-200">
                                     <img v-if="item.image" :src="item.image" :alt="item.title" class="w-full h-full object-cover">
@@ -695,8 +711,25 @@ const pageTitle = computed(() => {
                                             </span>
                                             <span class="text-xs text-gray-400 font-medium">Reported {{ item.timeAgo }}</span>
                                         </div>
-                                        <h3 :class="['text-xl font-bold', item.status === 'Matched' ? 'text-indigo-900' : 'text-gray-900']">{{ item.title }}</h3>
-                                        <p :class="['text-sm mt-1', item.status === 'Matched' ? 'text-indigo-700' : 'text-gray-600']">{{ item.category }} · {{ item.location }}</p>
+                                        <h3 :class="['text-xl font-bold', item.status === 'Matched' ? 'text-indigo-900' : item.status === 'Claimed' ? 'text-emerald-900' : 'text-gray-900']">{{ item.title }}</h3>
+                                        <p :class="['text-sm mt-1', item.status === 'Matched' ? 'text-indigo-700' : item.status === 'Claimed' ? 'text-emerald-700' : 'text-gray-600']">{{ item.category }} · {{ item.location }}</p>
+
+                                        <!-- High Confidence Match alert (Matched only) -->
+                                        <div v-if="item.status === 'Matched'" class="mt-3 p-3 bg-indigo-100 border border-indigo-200 rounded-xl flex items-start gap-3">
+                                            <div class="w-7 h-7 rounded-full bg-indigo-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <svg class="w-3.5 h-3.5 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-bold text-indigo-900">High Confidence Match Found</p>
+                                                <p class="text-xs text-indigo-700 mt-0.5">Our AI found a potential match. Visit the security desk with your OTP to collect your item.</p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Claimed success banner -->
+                                        <div v-else-if="item.status === 'Claimed'" class="mt-3 p-3 bg-emerald-100 border border-emerald-200 rounded-xl flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                            <p class="text-xs font-semibold text-emerald-800">Your item has been successfully verified and handed over at the security desk.</p>
+                                        </div>
                                     </div>
 
                                     <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -704,18 +737,24 @@ const pageTitle = computed(() => {
                                             <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                             {{ item.location }}
                                         </div>
-                                        <button @click="openReportModal(item)" class="bg-white border border-indigo-200 text-indigo-700 font-bold py-2 px-6 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm whitespace-nowrap">
-                                            View Report
-                                        </button>
+                                        <div class="flex items-center gap-3">
+                                            <button v-if="item.status === 'Matched'" @click="generateOtp(item)" :disabled="otpLoading[item.id]" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm whitespace-nowrap disabled:opacity-60 text-sm">
+                                                {{ otpLoading[item.id] ? 'Sending…' : 'Generate Claim OTP' }}
+                                            </button>
+                                            <button @click="openReportModal(item)" class="bg-white border border-indigo-200 text-indigo-700 font-bold py-2 px-6 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm whitespace-nowrap">
+                                                View Report
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <transition name="fade">
-                            <div v-if="isReportModalOpen && selectedReport" class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+                            <div v-if="isReportModalOpen && selectedReport" class="fixed inset-0 z-50 overflow-y-auto">
                                 <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeReportModal"></div>
 
+                                <div class="relative flex min-h-full items-center justify-center px-4 py-8">
                                 <div class="relative z-10 w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden border border-gray-200">
                                     <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/80">
                                         <div>
@@ -768,6 +807,7 @@ const pageTitle = computed(() => {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         </transition>

@@ -230,13 +230,13 @@
                           <div class="text-[10px] font-bold text-slate-400 bg-slate-200 px-3 py-1 rounded-full">Location unavailable</div>
                       </div>
                   </div>
-              </div>
 
-              <div class="p-8 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-10">
-                  <button @click="triggerOTP" :disabled="otpLoading" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-slate-900/20 disabled:opacity-50">
-                      <span v-if="!otpLoading">Initiate OTP Secure Handover</span>
-                      <span v-else>Triggering Telegram API...</span>
-                  </button>
+                  <div class="pt-2">
+                      <button @click="triggerOTP" :disabled="otpLoading" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-slate-900/20 disabled:opacity-50">
+                          <span v-if="!otpLoading">Initiate OTP Secure Handover</span>
+                          <span v-else>Triggering Telegram API...</span>
+                      </button>
+                  </div>
               </div>
           </div>
     </transition>
