@@ -78,6 +78,11 @@ class VisionService
             return $path;
         }
 
-        return rtrim(config('app.url'), '/') . '/storage/' . ltrim($path, '/');
+        // Prefer STORAGE_PUBLIC_URL (set in Dokploy to the public domain).
+        // Fall back to APP_URL only as a last resort — it may be localhost in some setups.
+        $base = config('services.storage.public_url')
+            ?? config('app.url');
+
+        return rtrim($base, '/') . '/storage/' . ltrim($path, '/');
     }
 }

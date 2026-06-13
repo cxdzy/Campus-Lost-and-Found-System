@@ -36,6 +36,10 @@ return [
         'vision_api_key' => env('GOOGLE_VISION_API_KEY'),
     ],
 
+    'storage' => [
+        'public_url' => env('STORAGE_PUBLIC_URL'),
+    ],
+
     'bot' => [
         'secret' => env('LARAVEL_BOT_SECRET'),
     ],
