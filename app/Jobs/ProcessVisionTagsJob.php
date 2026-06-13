@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\FoundItem;
 use App\Services\MatchingService;
-use App\Services\MockCloudVisionService;
+use App\Services\VisionService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +17,7 @@ class ProcessVisionTagsJob implements ShouldQueue
 
     public function __construct(public readonly int $foundItemId) {}
 
-    public function handle(MockCloudVisionService $vision, MatchingService $matching): void
+    public function handle(VisionService $vision, MatchingService $matching): void
     {
         $foundItem = FoundItem::find($this->foundItemId);
 

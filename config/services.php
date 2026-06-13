@@ -32,6 +32,10 @@ return [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
     ],
 
+    'google' => [
+        'vision_api_key' => env('GOOGLE_VISION_API_KEY'),
+    ],
+
     'bot' => [
         'secret' => env('LARAVEL_BOT_SECRET'),
     ],
