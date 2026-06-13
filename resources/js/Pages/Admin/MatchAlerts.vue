@@ -29,7 +29,7 @@ const verify = async (alert) => {
     try {
         await window.axios.post(`/admin/match-alerts/${alert.id}/verify`);
         const idx = alerts.value.findIndex(a => a.id === alert.id);
-        if (idx !== -1) alerts.value[idx].has_pending_claim = true;
+        if (idx !== -1) alerts.value[idx] = { ...alerts.value[idx], has_pending_claim: true };
         otpInputs.value[alert.id] = '';
         otpErrors.value[alert.id] = '';
         showToast('OTP sent to student via Telegram.', 'success');
