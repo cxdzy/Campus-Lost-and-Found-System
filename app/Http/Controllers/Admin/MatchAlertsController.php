@@ -62,7 +62,7 @@ class MatchAlertsController extends Controller
             [
                 'security_guard_id' => Auth::id(),
                 'otp_code'          => $otp,
-                'expires_at'        => now()->addMinutes(5),
+                'expires_at'        => now()->addMinutes(15),
             ]
         );
 
@@ -73,7 +73,7 @@ class MatchAlertsController extends Controller
                     . "<b>{$foundTitle}</b>\n\n"
                     . "Your one-time claim code is:\n"
                     . "<b>{$otp}</b>\n\n"
-                    . "⏱ This code expires in <b>5 minutes</b>.\n"
+                    . "⏱ This code expires in <b>15 minutes</b>.\n"
                     . "Show it to the security desk to collect your item.";
 
         app(TelegramService::class)->sendMessage(
