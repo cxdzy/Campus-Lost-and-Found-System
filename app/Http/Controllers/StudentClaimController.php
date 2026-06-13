@@ -8,13 +8,12 @@ use App\Models\MatchAlert;
 use App\Models\ReownershipClaim;
 use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class StudentClaimController extends Controller
 {
-    public function requestOtp(Request $request, Item $item): JsonResponse
+    public function requestOtp(Item $item): JsonResponse
     {
         $user = Auth::user();
 
@@ -43,7 +42,7 @@ class StudentClaimController extends Controller
             return response()->json(['message' => 'No match alert found for this item.'], 404);
         }
 
-        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $otp = str_pad((string) \random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         DB::beginTransaction();
         try {
@@ -54,9 +53,8 @@ class StudentClaimController extends Controller
                     'claimed_at'    => null,
                 ],
                 [
-                    'security_guard_id' => null,
-                    'otp_code'          => $otp,
-                    'expires_at'        => now()->addMinutes(15),
+                    'otp_code'   => $otp,
+                    'expires_at' => now()->addMinutes(15),
                 ]
             );
             DB::commit();
