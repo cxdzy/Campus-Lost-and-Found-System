@@ -13,6 +13,10 @@ const alerts = ref(props.alerts);
 const verifying = ref({});
 const toastMessage = ref('');
 const toastType = ref('success');
+const otpInputs = ref({});
+const confirming = ref({});
+const otpErrors = ref({});
+const claimedAlerts = ref(new Set());
 
 const showToast = (message, type = 'success') => {
     toastMessage.value = message;
@@ -26,12 +30,33 @@ const verify = async (alert) => {
         await window.axios.post(`/admin/match-alerts/${alert.id}/verify`);
         const idx = alerts.value.findIndex(a => a.id === alert.id);
         if (idx !== -1) alerts.value[idx].has_pending_claim = true;
+        otpInputs.value[alert.id] = '';
+        otpErrors.value[alert.id] = '';
         showToast('OTP sent to student via Telegram.', 'success');
     } catch (err) {
         const msg = err?.response?.data?.message ?? 'Failed to send OTP. Please try again.';
         showToast(msg, 'error');
     } finally {
         verifying.value[alert.id] = false;
+    }
+};
+
+const confirmOtp = async (alert) => {
+    const code = (otpInputs.value[alert.id] ?? '').trim();
+    if (code.length !== 6) {
+        otpErrors.value[alert.id] = 'Enter the 6-digit OTP.';
+        return;
+    }
+    otpErrors.value[alert.id] = '';
+    confirming.value[alert.id] = true;
+    try {
+        await window.axios.post(`/admin/match-alerts/${alert.id}/confirm-otp`, { otp_code: code });
+        claimedAlerts.value.add(alert.id);
+        showToast('Item successfully claimed.', 'success');
+    } catch (err) {
+        otpErrors.value[alert.id] = err?.response?.data?.message ?? 'Verification failed. Please try again.';
+    } finally {
+        confirming.value[alert.id] = false;
     }
 };
 
@@ -170,16 +195,59 @@ const formatDate = (iso) => {
                     </div>
 
                     <!-- Action column -->
-                    <div class="flex items-center justify-center p-6 border-t lg:border-t-0 lg:border-l border-slate-100 bg-slate-50/40">
+                    <div class="flex flex-col items-stretch justify-center p-6 border-t lg:border-t-0 lg:border-l border-slate-100 bg-slate-50/40 gap-3">
+
+                        <!-- State 3: Claimed -->
+                        <div v-if="claimedAlerts.has(alert.id)"
+                             class="flex flex-col items-center justify-center gap-2 py-2">
+                            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-700 uppercase tracking-wide">Claimed</span>
+                        </div>
+
+                        <!-- State 2: OTP input (pending claim) -->
+                        <template v-else-if="alert.has_pending_claim">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enter Student OTP</label>
+                            <input
+                                v-model="otpInputs[alert.id]"
+                                type="text"
+                                inputmode="numeric"
+                                maxlength="6"
+                                placeholder="000000"
+                                class="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-center text-lg font-mono font-bold tracking-[0.4em] focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                @keyup.enter="confirmOtp(alert)"
+                            />
+                            <p v-if="otpErrors[alert.id]" class="text-xs text-red-500 font-semibold -mt-1">{{ otpErrors[alert.id] }}</p>
+                            <button
+                                @click="confirmOtp(alert)"
+                                :disabled="confirming[alert.id]"
+                                class="w-full bg-emerald-600 text-white py-2.5 px-4 rounded-xl text-sm font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                <svg v-if="confirming[alert.id]" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                </svg>
+                                <span>{{ confirming[alert.id] ? 'Verifying…' : 'Confirm Claim' }}</span>
+                            </button>
+                            <button
+                                @click="verify(alert)"
+                                :disabled="verifying[alert.id]"
+                                class="w-full text-xs text-slate-500 font-semibold hover:text-indigo-600 transition-colors disabled:opacity-50">
+                                Resend OTP
+                            </button>
+                        </template>
+
+                        <!-- State 1: Initial verify -->
                         <button
+                            v-else
                             @click="verify(alert)"
                             :disabled="verifying[alert.id]"
                             class="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl text-sm font-bold hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                            <svg v-if="verifying[alert.id]"
-                                 class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <svg v-if="verifying[alert.id]" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                <path class="opacity-75" fill="currentColor"
-                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                             </svg>
                             <span>{{ verifying[alert.id] ? 'Sending…' : 'Verify & Notify' }}</span>
                         </button>

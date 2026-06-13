@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FoundItem;
+use App\Models\Item;
 use App\Models\LostItem;
 use App\Models\MatchAlert;
 use App\Models\ReownershipClaim;
@@ -11,6 +12,7 @@ use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -84,6 +86,36 @@ class MatchAlertsController extends Controller
         );
 
         return response()->json(['message' => 'OTP sent to student via Telegram.']);
+    }
+
+    public function confirmOtp(Request $request, MatchAlert $matchAlert): JsonResponse
+    {
+        $request->validate(['otp_code' => 'required|string|size:6']);
+
+        $claim = ReownershipClaim::where('found_item_id', $matchAlert->found_item_id)
+            ->where('otp_code', $request->otp_code)
+            ->whereNull('claimed_at')
+            ->first();
+
+        if (!$claim) {
+            return response()->json(['message' => 'Invalid OTP code.'], 422);
+        }
+
+        if ($claim->expires_at->isPast()) {
+            return response()->json(['message' => 'OTP has expired. Please send a new one.'], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $claim->update(['claimed_at' => now()]);
+            Item::where('id', $matchAlert->found_item_id)->update(['status' => 'Claimed']);
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['message' => 'Item successfully claimed.']);
     }
 
     private function formatAlert(MatchAlert $alert): array
