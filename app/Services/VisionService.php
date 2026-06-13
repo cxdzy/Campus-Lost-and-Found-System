@@ -31,7 +31,7 @@ class VisionService
         ];
 
         try {
-            $response   = Http::timeout(15)->post(self::ENDPOINT . '?key=' . $apiKey, $requestBody);
+            $response   = Http::withoutVerifying()->timeout(15)->post(self::ENDPOINT . '?key=' . $apiKey, $requestBody);
             $statusCode = $response->status();
             $labels     = $response->json('responses.0.labelAnnotations') ?? [];
 
