@@ -140,6 +140,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/items/{item}', [ItemController::class, 'destroy']);
     });
 
+    Route::post('/dashboard/generate-otp/{item}', [\App\Http\Controllers\StudentClaimController::class, 'requestOtp'])
+        ->name('dashboard.generate-otp');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

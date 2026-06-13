@@ -167,14 +167,23 @@ const mapReportToCard = (item) => ({
 const reportItems = computed(() => myReports.value.map(mapReportToCard));
 
 const otpLoading = ref({});
+const otpToast = ref('');
+const otpToastType = ref('success');
+
+const showOtpToast = (message, type = 'success') => {
+    otpToast.value = message;
+    otpToastType.value = type;
+    setTimeout(() => { otpToast.value = ''; }, 5000);
+};
 
 const generateOtp = async (item) => {
-    if (!item.matchAlertId) return;
     otpLoading.value[item.id] = true;
     try {
-        await window.axios.post(`/dashboard/data/match-alerts/${item.matchAlertId}/request-otp`);
+        const res = await window.axios.post(`/dashboard/generate-otp/${item.id}`);
+        showOtpToast(res.data?.message ?? 'OTP sent to your Telegram.', 'success');
     } catch (e) {
-        // errors handled in next fix
+        const msg = e?.response?.data?.message ?? 'Could not send OTP. Please try again.';
+        showOtpToast(msg, 'error');
     } finally {
         otpLoading.value[item.id] = false;
     }
@@ -681,6 +690,13 @@ const pageTitle = computed(() => {
                             </div>
                         </transition>
 
+                        <transition name="fade">
+                            <div v-if="otpToast"
+                                 :class="['mb-4 px-5 py-3 rounded-xl text-sm font-semibold shadow border', otpToastType === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200']">
+                                {{ otpToast }}
+                            </div>
+                        </transition>
+
                         <div class="space-y-6">
                             <div v-if="reportItems.length === 0" class="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
                                 <div class="mx-auto w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
@@ -752,7 +768,7 @@ const pageTitle = computed(() => {
 
                         <transition name="fade">
                             <div v-if="isReportModalOpen && selectedReport" class="fixed inset-0 z-50 overflow-y-auto">
-                                <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeReportModal"></div>
+                                <div class="fixed inset-0 min-h-screen bg-slate-900/60 backdrop-blur-sm" @click="closeReportModal"></div>
 
                                 <div class="relative flex min-h-full items-center justify-center px-4 py-8">
                                 <div class="relative z-10 w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden border border-gray-200">

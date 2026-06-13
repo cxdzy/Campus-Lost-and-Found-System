@@ -109,6 +109,7 @@ class MatchAlertsController extends Controller
         try {
             $claim->update(['claimed_at' => now()]);
             Item::where('id', $matchAlert->found_item_id)->update(['status' => 'Claimed']);
+            Item::where('id', $matchAlert->lost_item_id)->update(['status' => 'Claimed']);
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
