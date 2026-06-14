@@ -65,16 +65,23 @@ const mapZoom   = ref(15);
 const mapCenter = ref([3.0697, 101.5037]);
 const markerLatLng = ref(null);
 
-const onMapClick = (event) => {
-    const { lat, lng } = event.latlng;
+const setPin = (lat, lng) => {
     markerLatLng.value = [lat, lng];
     reportForm.value.coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const gpsLabel = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    if (!reportForm.value.locationName || reportForm.value.locationName.startsWith('GPS:')) {
+        reportForm.value.locationName = gpsLabel;
+    }
+};
+
+const onMapClick = (event) => {
+    const { lat, lng } = event.latlng;
+    setPin(lat, lng);
 };
 
 const onMarkerDragEnd = (event) => {
     const { lat, lng } = event.target.getLatLng();
-    markerLatLng.value = [lat, lng];
-    reportForm.value.coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    setPin(lat, lng);
 };
 
 const isFoundReport = computed(() => reportForm.value.type === 'Found');
@@ -145,7 +152,7 @@ const mapItemToCard = (item) => {
         id: item.id,
         title: item.title_description,
         category: categoryName,
-        location: item.location_name || (item.latitude && item.longitude ? `GPS: ${item.latitude}, ${item.longitude}` : 'Unknown location'),
+        location: (!item.location_name || item.location_name === 'Unknown location') && item.latitude && item.longitude ? `GPS: ${item.latitude}, ${item.longitude}` : (item.location_name || 'Unknown location'),
         timeAgo: formatTimeAgo(item.created_at),
         image: item.image_url ? normalizeImagePath(item.image_url) : '/images/placeholder-item.svg',
         lat: item.latitude ?? null,
@@ -157,7 +164,7 @@ const mapReportToCard = (item) => ({
     id: item.id,
     title: item.title_description,
     category: typeof item.category === 'string' ? item.category : (item.category?.category_name ?? 'Uncategorized'),
-    location: item.location_name || (item.latitude && item.longitude ? `GPS: ${item.latitude}, ${item.longitude}` : 'Unknown location'),
+    location: (!item.location_name || item.location_name === 'Unknown location') && item.latitude && item.longitude ? `GPS: ${item.latitude}, ${item.longitude}` : (item.location_name || 'Unknown location'),
     status: item.status ?? 'Pending',
     timeAgo: formatTimeAgo(item.created_at),
     image: item.image_url ? normalizeImagePath(item.image_url) : null,
