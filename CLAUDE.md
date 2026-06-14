@@ -12,8 +12,7 @@ automated recovery pipeline built around a **Laravel back-end** orchestrating vi
 spatial matching, and Telegram notifications.
 
 The defining feature is **AI Vision + spatial matching**: when a "Found" item is reported via the
-Telegram bot, the system extracts visual tags via **Google Cloud Vision API** and stores GPS coordinates 
-coordinates. A matching engine compares tags + proximity against Lost reports. A notification fires
+Telegram bot, the system extracts visual tags via **Google Cloud Vision API** and stores GPS coordinates. A matching engine compares tags + proximity against Lost reports. A notification fires
 only when the confidence score exceeds the configured threshold (default 80%).
 
 - **Course context:** ITT626 — Back-End Technology
@@ -199,9 +198,7 @@ TPT pattern: derived models set `$primaryKey = 'item_id'` (or `user_id`) and
 12. **Popup z-index inside Leaflet DOM** — may clip on some browsers.
     Fix: render popup outside `<LMap>` element.
 
-### 🔵 P5 — Future (blocked on external dependency)
-13. ~~**Real Vision integration**~~ ✅ Fixed — Google Cloud Vision API via `VisionService`,
-    native PHP curl, `GOOGLE_VISION_API_KEY` env var, base64 image encoding
+
 
 ---
 
@@ -271,8 +268,6 @@ ApiLog::create([
 - **Upload limit:** 20MB enforced at three layers — `public/.user.ini`, `docker/nginx-upload.conf`, `StoreReportRequest`.
 - **Vision API:** calls go through `VisionService` only. Never call Google Vision API 
   directly from controllers. `GOOGLE_VISION_API_KEY` in Dokploy env vars only.
-- **PHP curl for external APIs:** Guzzle/Http facade cannot reach googleapis.com inside 
-  the Nixpacks container — use native PHP curl via `curlPost()` helper in VisionService.
   - **Vision API uses native PHP curl** — Laravel's Http facade (Guzzle) cannot reach googleapis.com 
   inside the Nixpacks container. VisionService uses `curlPost()` helper with native PHP curl, 
   HTTP/1.1 forced, SSL verify disabled. Never revert to Http facade for Vision API calls.
@@ -361,9 +356,6 @@ TELEGRAM_BOT_TOKEN=...
 LARAVEL_BOT_SECRET=...
 LARAVEL_APP_URL=https://your-domain.com
 MATCH_CONFIDENCE_THRESHOLD=0.80
-GOOGLE_VISION_API_KEY=...
-STORAGE_PUBLIC_URL=http://your-vps-ip:8000   # used by VisionService to build image URLs
-
 GOOGLE_VISION_API_KEY=...        # Google Cloud Vision API key, free tier 1000/month
 STORAGE_PUBLIC_URL=http://your-vps-ip:8000  # public URL for VisionService to build image URLs
                                               # must NOT be localhost — Google needs to fetch the image
