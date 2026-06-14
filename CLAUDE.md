@@ -12,7 +12,7 @@ automated recovery pipeline built around a **Laravel back-end** orchestrating vi
 spatial matching, and Telegram notifications.
 
 The defining feature is **AI Vision + spatial matching**: when a "Found" item is reported via the
-Telegram bot, the system extracts visual tags (currently mocked; OpenCV target) and stores GPS
+Telegram bot, the system extracts visual tags via **Google Cloud Vision API** and stores GPS coordinates 
 coordinates. A matching engine compares tags + proximity against Lost reports. A notification fires
 only when the confidence score exceeds the configured threshold (default 80%).
 
@@ -30,7 +30,7 @@ only when the confidence score exceeds the configured threshold (default 80%).
 | Back-end API | Laravel (PHP) |
 | Web frontend | Vue.js SPA via **Inertia.js** |
 | Telegram Bot | **Separate Node.js service** using **Telegraf** — own Dokploy service, own GitHub repo (`Campus-Lost-and-Found-System-Bot`) |
-| Vision tagging | **OpenCV** target — currently `MockCloudVisionService` (random tags + ApiLog) |
+| Vision tagging | **Google Cloud Vision API** — `VisionService` (native PHP curl, base64 encoding, LABEL_DETECTION); falls back to `MockCloudVisionService` if `GOOGLE_VISION_API_KEY` not set |
 | Geolocation | Raw GPS lat/long — Haversine in `MatchingService`; map UI uses **Leaflet/OSM** |
 | Database | **PostgreSQL** (Dokploy service) |
 | Hosting / deploy | **VPS + Dokploy** — three separate services: Laravel, Node.js bot, Postgres |
@@ -60,7 +60,7 @@ integrations, queued jobs for slow work (vision, notifications), route-model bin
 5. Bot receives `{id}` response → stores `found_item_id` in session → asks for GPS.
 6. Finder shares location → bot POSTs to `POST /api/bot/update-location` with
    `{found_item_id, latitude, longitude}`.
-7. Laravel updates Item coordinates → job runs `MockCloudVisionService` → saves `AiTag` records.
+7. Laravel updates Item coordinates → job runs `VisionService` (Google Cloud Vision API) → saves `AiTag` records.
 8. `MatchingService` runs → if score > threshold → fires Telegram alert to loser via `TelegramService`.
 
 ### Lost workflow (Web SPA → Laravel) ✅ FULLY WORKING
@@ -76,7 +76,7 @@ integrations, queued jobs for slow work (vision, notifications), route-model bin
 - Threshold read from `config('matching.threshold')` → env `MATCH_CONFIDENCE_THRESHOLD` (default 0.80).
 - Score > threshold → writes `MatchAlert` row → `TelegramService::sendMessage()` notifies loser.
 - Admin sees match in **Match Alerts** dashboard → clicks "Verify & Notify" → OTP generated in
-  `reownership_claims` with `expires_at` 5 min → sent to student via Telegram.
+  `reownership_claims` with `expires_at` 15 min → sent to student via Telegram.
 - Student presents OTP at security desk → staff verifies → item marked `Claimed`.
 
 ### Bot → Laravel API contract
@@ -121,6 +121,7 @@ Both endpoints require the `X-Bot-Secret` header — checked against `config('se
 - Match Alerts — side-by-side Lost vs Found comparison, match score, "Verify & Notify"
 - API Logs — real-time OpenCV/Telegram transaction monitoring
 - Users management, Reports
+- OTP confirmation — security enters student's OTP code → item marked Claimed (15 min expiry)
 
 ---
 
@@ -140,7 +141,7 @@ Both endpoints require the `X-Bot-Secret` header — checked against `config('se
 - **match_alerts**: `id`, `lost_item_id` FK, `found_item_id` FK, `match_score` float, `is_notified` bool
 
 ### Security & Monitoring
-- **reownership_claims**: `id`, `found_item_id` FK, `loser_id` FK, `security_guard_id` FK, `otp_code`, `expires_at` timestamp, `claimed_at`
+- **reownership_claims**: `id`, `found_item_id` FK, `loser_id` FK, `security_guard_id` FK nullable (null until admin confirms at desk), `otp_code`, `expires_at` timestamp, `claimed_at`
 - **api_logs**: `id`, `item_id` FK nullable, `service` string, `http_status_code` int, `payload_response` text, `logged_at`
 
 ---
@@ -156,15 +157,19 @@ TPT pattern: derived models set `$primaryKey = 'item_id'` (or `user_id`) and
 
 ### Services (all exist)
 - `MatchingService` — Haversine + tag-overlap scoring, dispatches via `TelegramService` ✅
-- `MockCloudVisionService` — random tags + ApiLog entry ✅
+- `VisionService` — Google Cloud Vision API, native PHP curl, base64 image encoding, 
+  LABEL_DETECTION 10 results, logs to ApiLog ✅
+- `MockCloudVisionService` — fallback only when `GOOGLE_VISION_API_KEY` not set ✅
 - `TelegramService` — `sendMessage(chatId, text, ?itemId, redactPayload)`, logs to ApiLog ✅
 
 ### Controllers (all exist)
-- `BotSubmissionController` — `store()` + `updateLocation()`, both gated by `X-Bot-Secret` ✅
+- `BotSubmissionController` — `store()` + `updateLocation()` + `linkAccount()`, all gated by `X-Bot-Secret` ✅
 - `ItemController` — full CRUD, dispatches `ProcessVisionTagsJob` for Found items ✅
 - `CategoryController` ✅
-- `Admin\MatchAlertsController` — `index()` + `verify()` (OTP generation + Telegram send) ✅
-- `DashboardController`, `ReportsController`, `UsersController`, `AuthenticatedSessionController` ✅
+- `StudentClaimController` — `generateOtp()` student-side OTP generation, finds best MatchAlert for the lost item, upserts OTP in `reownership_claims` with 15-min expiry, sends via `TelegramService` ✅
+- `Admin\MatchAlertsController` — `index()` + `verify()` (OTP generation + Telegram send) + `confirmOtp()` (validates OTP, marks both found and lost items as Claimed, sets `security_guard_id`) ✅
+- `Admin\DashboardController` — inventory list + `destroy()` (cascading delete of found item and all related records) ✅
+- `ReportsController`, `UsersController`, `AuthenticatedSessionController` ✅
 
 ### Middleware
 - `EnsureUserRole` — RBAC, gates Admin/Security routes ✅
@@ -175,7 +180,7 @@ TPT pattern: derived models set `$primaryKey = 'item_id'` (or `user_id`) and
 `UpdateUserRequest`, `LoginRequest`, `ProfileUpdateRequest`
 
 ### Jobs
-- `ProcessVisionTagsJob` — 3 retries, runs `MockCloudVisionService` then `MatchingService` ✅
+- `ProcessVisionTagsJob` — 3 retries, runs `VisionService` then `MatchingService` ✅
 
 ### Vue Pages (all exist)
 - Student: `Dashboard` (gallery + Leaflet report form + my-reports + settings + map modal)
@@ -195,9 +200,8 @@ TPT pattern: derived models set `$primaryKey = 'item_id'` (or `user_id`) and
     Fix: render popup outside `<LMap>` element.
 
 ### 🔵 P5 — Future (blocked on external dependency)
-13. **Real OpenCV integration** — swap `MockCloudVisionService` for real HTTP call to OpenCV
-    microservice inside `ProcessVisionTagsJob`. Everything else (ApiLog, MatchingService,
-    queue) stays the same — single class swap when microservice is ready.
+13. ~~**Real Vision integration**~~ ✅ Fixed — Google Cloud Vision API via `VisionService`,
+    native PHP curl, `GOOGLE_VISION_API_KEY` env var, base64 image encoding
 
 ---
 
@@ -265,6 +269,16 @@ ApiLog::create([
 - **Postgres only.** No MySQL syntax. `float` for coordinates, `jsonb` for payloads.
 - **Inertia for web routes, JSON for API routes.** Never mix.
 - **Upload limit:** 20MB enforced at three layers — `public/.user.ini`, `docker/nginx-upload.conf`, `StoreReportRequest`.
+- **Vision API:** calls go through `VisionService` only. Never call Google Vision API 
+  directly from controllers. `GOOGLE_VISION_API_KEY` in Dokploy env vars only.
+- **PHP curl for external APIs:** Guzzle/Http facade cannot reach googleapis.com inside 
+  the Nixpacks container — use native PHP curl via `curlPost()` helper in VisionService.
+  - **Vision API uses native PHP curl** — Laravel's Http facade (Guzzle) cannot reach googleapis.com 
+  inside the Nixpacks container. VisionService uses `curlPost()` helper with native PHP curl, 
+  HTTP/1.1 forced, SSL verify disabled. Never revert to Http facade for Vision API calls.
+- **STORAGE_PUBLIC_URL must be set** — VisionService builds image URLs using this env var. 
+  If not set it falls back to `APP_URL` which Nixpacks overrides to `localhost`, causing 
+  empty Vision API responses.
 
 ---
 
@@ -347,6 +361,12 @@ TELEGRAM_BOT_TOKEN=...
 LARAVEL_BOT_SECRET=...
 LARAVEL_APP_URL=https://your-domain.com
 MATCH_CONFIDENCE_THRESHOLD=0.80
+GOOGLE_VISION_API_KEY=...
+STORAGE_PUBLIC_URL=http://your-vps-ip:8000   # used by VisionService to build image URLs
+
+GOOGLE_VISION_API_KEY=...        # Google Cloud Vision API key, free tier 1000/month
+STORAGE_PUBLIC_URL=http://your-vps-ip:8000  # public URL for VisionService to build image URLs
+                                              # must NOT be localhost — Google needs to fetch the image
 ```
 
 ---
@@ -375,6 +395,10 @@ MATCH_CONFIDENCE_THRESHOLD=0.80
   the old container despite a successful rebuild (Docker Swarm `:latest` tag limitation).
 - `DOKPLOY_SERVICE_NAME` env var must be set in Dokploy to the Swarm service name 
   (e.g. `campus-lost-and-found-cxdzy-zpbakj`).
+
+  - **After every Dokploy rebuild**, run `redeploy` alias on VPS to force Swarm to use 
+  the new image: `alias redeploy='docker service update --force campus-lost-and-found-cxdzy-zpbakj'`
+  Add to `~/.bashrc` to persist across sessions.
 
 ---
 
