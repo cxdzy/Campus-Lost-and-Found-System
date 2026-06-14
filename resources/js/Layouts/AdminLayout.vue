@@ -13,29 +13,20 @@ const page = usePage();
 const navItems = [
     { label: 'Inventory',     key: 'inventory',     route: 'admin.dashboard' },
     { label: 'Match Alerts',  key: 'match-alerts',  route: 'admin.match-alerts' },
-    { label: 'API Logs',      key: 'api-logs',      route: 'admin.dashboard', tab: 'api-logs' },
+    { label: 'API Logs',      key: 'api-logs',      route: 'admin.api-logs' },
     { label: 'Reports',       key: 'reports',       route: 'admin.reports' },
 ];
-
-const currentRouteName = computed(() => page.props.ziggy?.location
-    ? new URL(page.props.ziggy.location).pathname
-    : '');
 
 const isActive = (item) => {
     const name = page.component;
     if (item.key === 'match-alerts') return name === 'Admin/MatchAlerts';
     if (item.key === 'reports')      return name === 'Admin/Reports';
+    if (item.key === 'api-logs')     return name === 'Admin/ApiLogs';
     if (item.key === 'inventory')    return name === 'Admin/AdminDashboard';
     return false;
 };
 
 const userName = computed(() => page.props.auth?.user?.name ?? 'Staff');
-
-const selectTab = (tab) => {
-    try {
-        window.dispatchEvent(new CustomEvent('admin-tab', { detail: tab }));
-    } catch (e) { /* ignore */ }
-};
 </script>
 
 <template>
@@ -53,27 +44,12 @@ const selectTab = (tab) => {
             <nav class="flex-1 p-6 space-y-1">
                 <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 px-2">Main Menu</div>
                 <template v-for="item in navItems" :key="item.key">
-                    <!-- Match Alerts → dedicated Inertia page -->
-                    <Link v-if="item.key === 'match-alerts'"
-                          :href="route('admin.match-alerts')"
+                    <!-- All nav items → dedicated Inertia pages -->
+                    <Link :href="route(item.route)"
                           :class="['w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all',
                               isActive(item) ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white']">
-                        Match Alerts
-                    </Link>
-                    <!-- Reports → dedicated Inertia page -->
-                    <Link v-else-if="item.key === 'reports'"
-                          :href="route('admin.reports')"
-                          :class="['w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all',
-                              isActive(item) ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white']">
-                        Reports
-                    </Link>
-                    <!-- Dashboard tabs (inventory / api-logs) → custom event -->
-                    <button v-else
-                            @click="$inertia.visit(route('admin.dashboard')); selectTab(item.tab ?? item.key)"
-                            :class="['w-full flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all',
-                                isActive(item) ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white']">
                         {{ item.label }}
-                    </button>
+                    </Link>
                 </template>
             </nav>
 

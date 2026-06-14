@@ -171,6 +171,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/reports', [\App\Http\Controllers\Admin\ReportsController::class, 'index'])->name('reports');
         Route::get('/users', [\App\Http\Controllers\Admin\UsersController::class, 'index'])->name('users');
         Route::get('/match-alerts', [\App\Http\Controllers\Admin\MatchAlertsController::class, 'index'])->name('match-alerts');
+        Route::get('/api-logs', [\App\Http\Controllers\Admin\ApiLogsController::class, 'index'])->name('api-logs');
         Route::post('/match-alerts/{matchAlert}/verify', [\App\Http\Controllers\Admin\MatchAlertsController::class, 'verify'])->name('match-alerts.verify');
         Route::post('/match-alerts/{matchAlert}/confirm-otp', [\App\Http\Controllers\Admin\MatchAlertsController::class, 'confirmOtp'])->name('match-alerts.confirm-otp');
 
