@@ -102,7 +102,7 @@ Route::get('/dashboard', function (Request $request) {
                 ->get()
                 ->map(fn (Item $item) => array_merge(
                     resolveItemPayload($item),
-                    ['id' => $item->id, 'created_at' => $item->created_at, 'status' => $item->status]
+                    ['id' => $item->id, 'created_at' => $item->created_at, 'status' => $item->status, 'latitude' => $item->latitude, 'longitude' => $item->longitude]
                 ))
                 ->all();
         }
