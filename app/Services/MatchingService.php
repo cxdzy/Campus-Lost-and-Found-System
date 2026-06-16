@@ -109,18 +109,39 @@ class MatchingService
         return 0.60 * $tagScore + 0.40 * $proximityScore;
     }
 
+    private const STOPWORDS = ['the', 'and', 'was', 'for', 'my', 'its', 'with', 'has', 'not', 'are', 'but', 'this', 'that', 'from', 'have'];
+
     private function tagOverlapScore(array $foundTags, string $lostDescription): float
     {
         if (empty($foundTags)) {
             return 0.0;
         }
 
-        $desc  = strtolower($lostDescription);
-        $hits  = 0;
+        $desc = strtolower($lostDescription);
+
+        // Extract significant words from the description for bidirectional matching.
+        // Skip words shorter than 3 chars and common stopwords to avoid spurious hits.
+        $descWords = array_values(array_filter(
+            preg_split('/\W+/', $desc, -1, PREG_SPLIT_NO_EMPTY),
+            fn (string $w) => strlen($w) >= 3 && !in_array($w, self::STOPWORDS, true),
+        ));
+
+        $hits = 0;
 
         foreach ($foundTags as $tag) {
+            // Direction 1 (original): full tag phrase appears in the description.
             if (str_contains($desc, $tag)) {
                 $hits++;
+                continue;
+            }
+
+            // Direction 2 (bidirectional): any significant description word appears in the tag.
+            // e.g. description "phone" matches tag "mobile phone".
+            foreach ($descWords as $word) {
+                if (str_contains($tag, $word)) {
+                    $hits++;
+                    break;
+                }
             }
         }
 
