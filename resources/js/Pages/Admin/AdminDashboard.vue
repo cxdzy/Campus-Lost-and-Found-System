@@ -2,12 +2,12 @@
     <div>
         <Head title="Admin Dashboard" />
         <!-- Page content is rendered inside AdminLayout via layout slot -->
-          <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 shadow-sm">
+          <header class="h-auto min-h-[5rem] bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 z-10 shadow-sm py-4">
               <div>
-                  <h1 class="text-2xl font-bold text-slate-800 tracking-tight capitalize">{{ activeTab.replace('-', ' ') }}</h1>
+                  <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight capitalize">{{ activeTab.replace('-', ' ') }}</h1>
                   <p class="text-xs text-slate-500 font-medium">System Role: <span class="text-indigo-600">Authenticated Administrator</span></p>
               </div>
-              <div class="flex items-center space-x-4">
+              <div class="hidden sm:flex items-center space-x-4">
                   <div class="relative group">
                       <input type="text" placeholder="Global search..." class="pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 w-80 transition-all border border-slate-200">
                       <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 group-focus-within:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -15,53 +15,86 @@
               </div>
           </header>
 
-          <div class="flex-1 overflow-auto p-8 bg-slate-50 no-scrollbar">
+          <div class="flex-1 overflow-auto p-4 sm:p-8 bg-slate-50 no-scrollbar">
               
-              <div v-if="activeTab === 'inventory'" class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-                  <table class="min-w-full divide-y divide-slate-200">
-                      <thead class="bg-slate-50">
-                          <tr>
-                              <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Entry ID</th>
-                              <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Visual Evidence</th>
-                              <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Description</th>
-                              <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Proximity / Location</th>
-                              <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                              <th class="px-6 py-4 text-right"></th>
-                          </tr>
-                      </thead>
-                      <tbody class="divide-y divide-slate-100">
-                          <tr v-for="item in inventory" :key="item.id" class="hover:bg-slate-50/80 transition-all group">
-                              <td class="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-slate-500">#{{ item.id }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap">
-                                  <div class="w-16 h-12 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 shadow-inner">
-                                      <img :src="item.image" @error="handleImageError" class="w-full h-full object-cover group-hover:scale-110 transition-all">
+              <div v-if="activeTab === 'inventory'">
+                  <!-- Mobile card list (hidden on sm+) -->
+                  <div class="sm:hidden space-y-3">
+                      <div v-for="item in inventory" :key="item.id" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                          <div class="flex items-start gap-3 p-4">
+                              <div class="w-20 h-16 flex-shrink-0 bg-slate-200 rounded-xl overflow-hidden border border-slate-300 shadow-inner">
+                                  <img :src="item.image" @error="handleImageError" class="w-full h-full object-cover">
+                              </div>
+                              <div class="flex-1 min-w-0">
+                                  <div class="flex items-center justify-between gap-2 mb-1">
+                                      <span class="text-[10px] font-mono font-bold text-slate-400">#{{ item.id }}</span>
+                                      <span :class="['px-2 py-0.5 text-[10px] font-bold rounded-lg uppercase tracking-wider flex-shrink-0',
+                                          item.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                                          item.status === 'Matched' ? 'bg-indigo-100 text-indigo-700' :
+                                          'bg-emerald-100 text-emerald-700']">
+                                          {{ item.status }}
+                                      </span>
                                   </div>
-                              </td>
-                              <td class="px-6 py-4 whitespace-nowrap">
-                                  <div class="text-sm font-bold text-slate-800">{{ item.title }}</div>
+                                  <div class="text-sm font-bold text-slate-800 truncate">{{ item.title }}</div>
                                   <div class="text-[11px] text-indigo-500 font-semibold">{{ item.category }}</div>
-                              </td>
-                              <td class="px-6 py-4 whitespace-nowrap">
-                                  <div class="text-sm font-medium text-slate-600">{{ item.location }}</div>
-                                  <div class="text-[10px] text-slate-400 font-mono">{{ item.coords }}</div>
-                              </td>
-                              <td class="px-6 py-4 whitespace-nowrap">
-                                  <span :class="['px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider', 
-                                      item.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 
-                                      item.status === 'Matched' ? 'bg-indigo-100 text-indigo-700' : 
-                                      'bg-emerald-100 text-emerald-700']">
-                                      {{ item.status }}
-                                  </span>
-                              </td>
-                              <td class="px-6 py-4 whitespace-nowrap text-right">
-                                  <div class="flex items-center justify-end gap-2">
-                                      <button @click="selectItem(item)" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white transition-all">Audit Details</button>
-                                      <button @click="confirmDelete(item)" class="bg-white border border-red-300 text-red-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all">Delete</button>
-                                  </div>
-                              </td>
-                          </tr>
-                      </tbody>
-                  </table>
+                                  <div class="text-xs text-slate-500 mt-1 truncate">{{ item.location }}</div>
+                              </div>
+                          </div>
+                          <div class="border-t border-slate-100 px-4 py-3 flex gap-2">
+                              <button @click="selectItem(item)" class="flex-1 bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white transition-all text-center">Audit Details</button>
+                              <button @click="confirmDelete(item)" class="flex-1 bg-white border border-red-300 text-red-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all text-center">Delete</button>
+                          </div>
+                      </div>
+                      <div v-if="inventory.length === 0" class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-400">No items in inventory.</div>
+                  </div>
+
+                  <!-- Desktop table (hidden on mobile) -->
+                  <div class="hidden sm:block bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                      <table class="min-w-full divide-y divide-slate-200">
+                          <thead class="bg-slate-50">
+                              <tr>
+                                  <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Entry ID</th>
+                                  <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Visual Evidence</th>
+                                  <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Description</th>
+                                  <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Proximity / Location</th>
+                                  <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                  <th class="px-6 py-4 text-right"></th>
+                              </tr>
+                          </thead>
+                          <tbody class="divide-y divide-slate-100">
+                              <tr v-for="item in inventory" :key="item.id" class="hover:bg-slate-50/80 transition-all group">
+                                  <td class="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-slate-500">#{{ item.id }}</td>
+                                  <td class="px-6 py-4 whitespace-nowrap">
+                                      <div class="w-16 h-12 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 shadow-inner">
+                                          <img :src="item.image" @error="handleImageError" class="w-full h-full object-cover group-hover:scale-110 transition-all">
+                                      </div>
+                                  </td>
+                                  <td class="px-6 py-4 whitespace-nowrap">
+                                      <div class="text-sm font-bold text-slate-800">{{ item.title }}</div>
+                                      <div class="text-[11px] text-indigo-500 font-semibold">{{ item.category }}</div>
+                                  </td>
+                                  <td class="px-6 py-4 whitespace-nowrap">
+                                      <div class="text-sm font-medium text-slate-600">{{ item.location }}</div>
+                                      <div class="text-[10px] text-slate-400 font-mono">{{ item.coords }}</div>
+                                  </td>
+                                  <td class="px-6 py-4 whitespace-nowrap">
+                                      <span :class="['px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider',
+                                          item.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                                          item.status === 'Matched' ? 'bg-indigo-100 text-indigo-700' :
+                                          'bg-emerald-100 text-emerald-700']">
+                                          {{ item.status }}
+                                      </span>
+                                  </td>
+                                  <td class="px-6 py-4 whitespace-nowrap text-right">
+                                      <div class="flex items-center justify-end gap-2">
+                                          <button @click="selectItem(item)" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white transition-all">Audit Details</button>
+                                          <button @click="confirmDelete(item)" class="bg-white border border-red-300 text-red-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all">Delete</button>
+                                      </div>
+                                  </td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
               </div>
 
               <div v-if="activeTab === 'match-alerts'" class="space-y-6">
