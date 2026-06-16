@@ -67,12 +67,42 @@ const userName = computed(() => page.props.auth?.user?.name ?? 'Staff');
         </aside>
 
         <main class="flex-1 flex flex-col h-screen overflow-hidden">
-            <div class="flex-1 overflow-auto">
+            <div class="flex-1 overflow-auto pb-16 lg:pb-0">
                 <slot />
             </div>
         </main>
 
         <ToastStack />
+
+        <!-- Mobile bottom navigation (hidden on lg+ where sidebar is visible) -->
+        <nav class="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900 border-t border-slate-700 shadow-lg">
+            <div class="grid grid-cols-4 h-16">
+                <Link :href="route('admin.dashboard')"
+                      :class="['flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors',
+                          isActive({ key: 'inventory' }) ? 'text-indigo-400' : 'text-slate-400']">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    <span>Inventory</span>
+                </Link>
+                <Link :href="route('admin.match-alerts')"
+                      :class="['flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors',
+                          isActive({ key: 'match-alerts' }) ? 'text-indigo-400' : 'text-slate-400']">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    <span>Alerts</span>
+                </Link>
+                <Link :href="route('admin.api-logs')"
+                      :class="['flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors',
+                          isActive({ key: 'api-logs' }) ? 'text-indigo-400' : 'text-slate-400']">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>API Logs</span>
+                </Link>
+                <Link :href="route('admin.reports')"
+                      :class="['flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors',
+                          isActive({ key: 'reports' }) ? 'text-indigo-400' : 'text-slate-400']">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <span>Reports</span>
+                </Link>
+            </div>
+        </nav>
     </div>
 </template>
 
