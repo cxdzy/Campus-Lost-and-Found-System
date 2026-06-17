@@ -16,20 +16,39 @@ class ReportsController extends Controller
     {
         $this->authorize('viewAny', Item::class);
 
-        $query = Item::query()->with('category');
+        $items = Item::query()
+            ->with(['category', 'foundItem.finder.user', 'lostItem.loser.user'])
+            ->latest()
+            ->limit(200)
+            ->get()
+            ->map(function (Item $item) {
+                $isFound = $item->foundItem !== null;
+                $isLost  = $item->lostItem  !== null;
 
-        if ($request->filled('type')) {
-            $query->where('type', $request->string('type'));
-        }
+                $reporterName   = null;
+                $reporterMatric = null;
 
-        $reports = $query->latest()->limit(200)->get();
+                if ($isFound && $item->foundItem->finder?->user) {
+                    $reporterName = $item->foundItem->finder->user->name;
+                } elseif ($isLost && $item->lostItem->loser?->user) {
+                    $reporterName   = $item->lostItem->loser->user->name;
+                    $reporterMatric = $item->lostItem->loser->matric_number ?? null;
+                }
+
+                return array_merge($item->toArray(), [
+                    'type'            => $isFound ? 'Found' : ($isLost ? 'Lost' : null),
+                    'category_name'   => $item->category?->category_name,
+                    'reporter_name'   => $reporterName,
+                    'reporter_matric' => $reporterMatric,
+                ]);
+            });
 
         if ($request->wantsJson()) {
-            return response()->json(['data' => $reports]);
+            return response()->json(['data' => $items]);
         }
 
         return Inertia::render('Admin/Reports', [
-            'reports' => $reports,
+            'reports' => $items,
         ]);
     }
 

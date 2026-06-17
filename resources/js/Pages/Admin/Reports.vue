@@ -95,26 +95,38 @@
     </section>
 
     <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div class="border-b border-slate-100 px-6 py-4">
+      <div class="border-b border-slate-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500">Current Reports</h2>
+        <div class="relative w-full sm:w-72">
+          <input v-model="searchQuery" type="text" placeholder="Search title, name, matric…" class="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-300 bg-white text-sm focus:border-indigo-500 focus:ring-indigo-500">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
       </div>
 
       <div v-if="loading" class="px-6 py-8 text-sm text-slate-500">Loading reports...</div>
-      <div v-else-if="reports.length === 0" class="px-6 py-8 text-sm text-slate-500">No reports found.</div>
+      <div v-else-if="filteredReports.length === 0" class="px-6 py-8 text-sm text-slate-500">{{ searchQuery ? 'No reports match your search.' : 'No reports found.' }}</div>
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-slate-100">
           <thead class="bg-slate-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Title</th>
+              <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Reporter</th>
               <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Type</th>
               <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
               <th class="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 bg-white">
-            <tr v-for="report in reports" :key="report.id">
+            <tr v-for="report in filteredReports" :key="report.id">
               <td class="px-6 py-4 text-sm font-medium text-slate-900">{{ report.title_description }}</td>
-              <td class="px-6 py-4 text-sm text-slate-500">{{ report.type }}</td>
+              <td class="px-6 py-4">
+                <div class="text-sm font-medium text-slate-800">{{ report.reporter_name ?? '—' }}</div>
+                <div v-if="report.reporter_matric" class="text-xs font-mono text-slate-400">{{ report.reporter_matric }}</div>
+              </td>
+              <td class="px-6 py-4">
+                <span v-if="report.type" :class="['text-xs font-bold px-2.5 py-1 rounded-lg uppercase tracking-wide', report.type === 'Found' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700']">{{ report.type }}</span>
+                <span v-else class="text-sm text-slate-400">—</span>
+              </td>
               <td class="px-6 py-4 text-sm font-semibold text-slate-700">{{ report.status }}</td>
               <td class="px-6 py-4 text-right space-x-3">
                 <button type="button" class="text-sm font-semibold text-slate-600 hover:text-slate-900" @click="openView(report)">View</button>
@@ -431,6 +443,20 @@ const confirmDelete = async () => {
 }
 
 const imagePreviewDisplay = computed(() => imagePreview.value || '')
+
+const searchQuery = ref('')
+
+const filteredReports = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return reports.value
+  return reports.value.filter((r) => {
+    return (
+      (r.title_description ?? '').toLowerCase().includes(q) ||
+      (r.reporter_name    ?? '').toLowerCase().includes(q) ||
+      (r.reporter_matric  ?? '').toLowerCase().includes(q)
+    )
+  })
+})
 
 const viewReport = ref(null)
 const viewLoading = ref(false)
