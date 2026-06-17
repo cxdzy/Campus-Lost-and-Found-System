@@ -37,7 +37,42 @@ class ReportsController extends Controller
     {
         $this->authorize('view', $report);
 
-        return response()->json(['data' => $report->load('category')]);
+        $report->load(['category', 'foundItem.finder.user', 'lostItem.loser.user']);
+
+        $isFound = $report->foundItem !== null;
+        $isLost  = $report->lostItem  !== null;
+
+        $rawImage = $isFound
+            ? ($report->foundItem->image_path ?? null)
+            : ($report->lostItem?->image_path ?? null);
+
+        if (!$rawImage) {
+            $imageUrl = null;
+        } elseif (str_starts_with($rawImage, 'http')) {
+            $imageUrl = $rawImage;
+        } else {
+            $imageUrl = Storage::url($rawImage);
+        }
+
+        $reporterName   = null;
+        $reporterMatric = null;
+
+        if ($isFound && $report->foundItem->finder?->user) {
+            $reporterName = $report->foundItem->finder->user->name;
+        } elseif ($isLost && $report->lostItem->loser?->user) {
+            $reporterName   = $report->lostItem->loser->user->name;
+            $reporterMatric = $report->lostItem->loser->matric_number ?? null;
+        }
+
+        return response()->json([
+            'data' => array_merge($report->toArray(), [
+                'type'            => $isFound ? 'Found' : ($isLost ? 'Lost' : null),
+                'category_name'   => $report->category?->category_name,
+                'image_url'       => $imageUrl,
+                'reporter_name'   => $reporterName,
+                'reporter_matric' => $reporterMatric,
+            ]),
+        ]);
     }
 
     public function store(StoreReportRequest $request)

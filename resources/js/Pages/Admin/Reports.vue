@@ -117,6 +117,7 @@
               <td class="px-6 py-4 text-sm text-slate-500">{{ report.type }}</td>
               <td class="px-6 py-4 text-sm font-semibold text-slate-700">{{ report.status }}</td>
               <td class="px-6 py-4 text-right space-x-3">
+                <button type="button" class="text-sm font-semibold text-slate-600 hover:text-slate-900" @click="openView(report)">View</button>
                 <button type="button" class="text-sm font-semibold text-indigo-600 hover:text-indigo-500" @click="openEdit(report)">Edit</button>
                 <button type="button" class="text-sm font-semibold text-rose-600 hover:text-rose-500" @click="requestDelete(report)">Delete</button>
               </td>
@@ -125,6 +126,87 @@
         </table>
       </div>
     </section>
+
+    <!-- View loading overlay -->
+    <div v-if="viewLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40">
+      <div class="bg-white rounded-2xl px-8 py-6 shadow-2xl text-sm font-semibold text-slate-700">Loading report…</div>
+    </div>
+
+    <!-- Report detail modal -->
+    <div v-if="viewReport" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 overflow-y-auto">
+      <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-slate-50">
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Report #{{ viewReport.id }}</p>
+            <h3 class="text-xl font-bold text-slate-900 mt-1">{{ viewReport.title_description }}</h3>
+          </div>
+          <button @click="closeView" class="ml-4 flex-shrink-0 p-2 rounded-full text-slate-400 hover:text-slate-900 hover:bg-white border border-slate-200 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-6">
+          <!-- Image + meta grid -->
+          <div class="grid gap-6 sm:grid-cols-[180px_1fr]">
+            <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm h-44 sm:h-full min-h-[176px]">
+              <img v-if="viewReport.image_url" :src="viewReport.image_url" :alt="viewReport.title_description" class="w-full h-full object-cover">
+              <div v-else class="w-full h-full flex flex-col items-center justify-center gap-2">
+                <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span class="text-xs text-slate-400 font-medium">No image</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 content-start">
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category</p>
+                <p class="mt-1 text-sm font-semibold text-slate-800">{{ viewReport.category_name ?? '—' }}</p>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Type</p>
+                <p class="mt-1 text-sm font-semibold" :class="viewReport.type === 'Found' ? 'text-emerald-700' : 'text-indigo-700'">{{ viewReport.type ?? '—' }}</p>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</p>
+                <span :class="['mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-lg uppercase',
+                  viewReport.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                  viewReport.status === 'Matched' ? 'bg-indigo-100 text-indigo-700' :
+                  'bg-emerald-100 text-emerald-700']">{{ viewReport.status }}</span>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Created</p>
+                <p class="mt-1 text-xs font-semibold text-slate-800">{{ formatDate(viewReport.created_at) }}</p>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 col-span-2">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Location</p>
+                <p class="mt-1 text-sm font-semibold text-slate-800">{{ viewReport.location_name || '—' }}</p>
+                <p v-if="viewReport.latitude && viewReport.longitude" class="text-[10px] font-mono text-slate-400 mt-0.5">{{ viewReport.latitude }}, {{ viewReport.longitude }}</p>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 col-span-2">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reporter</p>
+                <p class="mt-1 text-sm font-semibold text-slate-800">{{ viewReport.reporter_name ?? '—' }}</p>
+                <p v-if="viewReport.reporter_matric" class="text-xs font-mono text-slate-500">{{ viewReport.reporter_matric }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Leaflet map -->
+          <div v-if="viewLatLng">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">GPS Location</p>
+            <div class="rounded-xl overflow-hidden border border-slate-200 shadow-sm" style="height:180px;">
+              <LMap :zoom="16" :center="viewLatLng" style="height:100%;width:100%;" :options="{ zoomControl: false, dragging: false, scrollWheelZoom: false }">
+                <LTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors" />
+                <LMarker :lat-lng="viewLatLng" />
+              </LMap>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-6 pb-6 flex justify-end">
+          <button @click="closeView" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors">Close</button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4">
       <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -144,6 +226,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Head } from '@inertiajs/vue3'
+import { LMap, LMarker, LTileLayer } from '@vue-leaflet/vue-leaflet'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const reports = ref([])
@@ -348,6 +431,36 @@ const confirmDelete = async () => {
 }
 
 const imagePreviewDisplay = computed(() => imagePreview.value || '')
+
+const viewReport = ref(null)
+const viewLoading = ref(false)
+
+const openView = async (report) => {
+  viewLoading.value = true
+  viewReport.value = null
+  try {
+    const res = await window.axios.get(`/admin/api/reports/${report.id}`)
+    viewReport.value = res.data?.data ?? null
+  } catch {
+    pushToast('error', 'Could not load report', 'Please try again.')
+  } finally {
+    viewLoading.value = false
+  }
+}
+
+const closeView = () => { viewReport.value = null }
+
+const viewLatLng = computed(() => {
+  const lat = parseFloat(viewReport.value?.latitude)
+  const lng = parseFloat(viewReport.value?.longitude)
+  if (!lat || !lng || (lat === 0 && lng === 0)) return null
+  return [lat, lng]
+})
+
+const formatDate = (val) => {
+  if (!val) return '—'
+  return new Date(val).toLocaleString('en-MY', { dateStyle: 'medium', timeStyle: 'short' })
+}
 
 onMounted(async () => {
   await Promise.all([fetchReferenceData(), fetchReports()])
