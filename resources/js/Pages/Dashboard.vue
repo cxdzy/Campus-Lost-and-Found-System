@@ -65,6 +65,25 @@ const mapZoom   = ref(15);
 const mapCenter = ref([3.0697, 101.5037]);
 const markerLatLng = ref(null);
 
+const isLocating = ref(false);
+
+const requestGeolocation = (dropPin = false) => {
+    if (!navigator.geolocation) return;
+    isLocating.value = true;
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            mapCenter.value = [lat, lng];
+            mapZoom.value = 16;
+            if (dropPin) setPin(lat, lng);
+            isLocating.value = false;
+        },
+        () => { isLocating.value = false; },
+        { timeout: 8000, maximumAge: 60000 },
+    );
+};
+
 const setPin = (lat, lng) => {
     markerLatLng.value = [lat, lng];
     reportForm.value.coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
@@ -421,6 +440,9 @@ onMounted(() => {
     if (tab && allowed.includes(tab)) {
         activeTab.value = tab;
     }
+
+    // Pre-centre the report map on the user's current location if permission is already granted.
+    requestGeolocation(false);
 });
 
 const changeTab = (tab) => {
@@ -636,7 +658,14 @@ const pageTitle = computed(() => {
                                 </div>
 
                                 <div class="bg-gray-50 border-l border-gray-100 p-8 md:p-10 flex flex-col">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Last Known Location</label>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-sm font-medium text-gray-700">Last Known Location</label>
+                                        <button type="button" @click="requestGeolocation(true)" :disabled="isLocating" class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors">
+                                            <svg v-if="!isLocating" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                            <svg v-else class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                            {{ isLocating ? 'Locating…' : 'Use My Location' }}
+                                        </button>
+                                    </div>
                                     <p class="text-xs text-gray-500 mb-4">Click on the map to drop a pin. This helps our algorithm calculate proximity to found items.</p>
 
                                     <div class="flex-1 rounded-xl overflow-hidden border border-gray-200 shadow-inner" style="min-height: 300px;">
