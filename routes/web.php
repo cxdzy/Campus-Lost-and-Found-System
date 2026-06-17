@@ -43,30 +43,24 @@ function resolveItemPayload(Item $item): array
 }
 
 Route::get('/', function () {
-    $items = [];
+    $totalFound   = 0;
+    $totalMatched = 0;
+    $totalClaimed = 0;
 
     if (Schema::hasTable('items')) {
-        $items = Item::query()
-            ->with(['category', 'foundItem'])
-            ->has('foundItem')
-            ->latest()
-            ->take(12)
-            ->get()
-            ->map(fn (Item $item) => [
-                'id'          => $item->id,
-                'image_url'   => resolveItemPayload($item)['image_url'],
-                'category'    => $item->category?->category_name,
-                'description' => $item->title_description,
-            ])
-            ->all();
+        $totalFound   = \App\Models\FoundItem::count();
+        $totalClaimed = \App\Models\Item::where('status', 'Claimed')->count();
+    }
+
+    if (Schema::hasTable('match_alerts')) {
+        $totalMatched = \App\Models\MatchAlert::count();
     }
 
     return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-        'items' => $items,
+        'canLogin'     => Route::has('login'),
+        'totalFound'   => $totalFound,
+        'totalMatched' => $totalMatched,
+        'totalClaimed' => $totalClaimed,
     ]);
 });
 
