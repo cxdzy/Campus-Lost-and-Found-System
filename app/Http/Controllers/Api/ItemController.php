@@ -4,10 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessVisionTagsJob;
+use App\Models\AiTag;
+use App\Models\ApiLog;
 use App\Models\FoundItem;
 use App\Models\Item;
 use App\Models\Loser;
 use App\Models\LostItem;
+use App\Models\MatchAlert;
+use App\Models\ReownershipClaim;
 use App\Services\MatchingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -159,25 +163,21 @@ class ItemController extends Controller
 
     public function update(Request $request, Item $item): JsonResponse
     {
+        $this->authorize('update', $item);
+
+        if ($item->status !== 'Pending') {
+            return response()->json(['message' => 'Only pending items can be edited.'], 422);
+        }
+
         $data = $request->validate([
             'category_id'       => ['sometimes', 'integer', 'exists:categories,id'],
             'title_description' => ['sometimes', 'string', 'max:255'],
             'latitude'          => ['sometimes', 'numeric'],
             'longitude'         => ['sometimes', 'numeric'],
             'location_name'     => ['sometimes', 'string', 'max:255'],
-            'status'            => ['sometimes', 'string', 'in:Pending,Matched,Claimed'],
         ]);
 
         $item->fill($data)->save();
-
-        // Handle OTP claim resolution: status → Claimed
-        if (($data['status'] ?? null) === 'Claimed' && $item->foundItem) {
-            $otpInput = $request->string('otp_code');
-            $claim    = $item->foundItem->reownershipClaim;
-            if ($claim && $claim->otp_code === $otpInput) {
-                $claim->update(['claimed_at' => now()]);
-            }
-        }
 
         $item->load(['category', 'foundItem.aiTags', 'lostItem']);
         $this->appendImageUrl($item);
@@ -187,7 +187,31 @@ class ItemController extends Controller
 
     public function destroy(Item $item): JsonResponse
     {
-        $item->delete();
+        $this->authorize('delete', $item);
+
+        $imagePath = $item->foundItem?->image_path;
+
+        DB::beginTransaction();
+        try {
+            AiTag::where('found_item_id', $item->id)->delete();
+            ReownershipClaim::where('found_item_id', $item->id)->delete();
+            MatchAlert::where('found_item_id', $item->id)
+                ->orWhere('lost_item_id', $item->id)
+                ->delete();
+            ApiLog::where('item_id', $item->id)->delete();
+            $item->foundItem?->delete();
+            $item->lostItem?->delete();
+            $item->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to delete item: ' . $e->getMessage()], 500);
+        }
+
+        if ($imagePath && !Str::startsWith($imagePath, ['http://', 'https://'])) {
+            Storage::disk('public')->delete($imagePath);
+        }
+
         return response()->json(null, 204);
     }
 

@@ -27,7 +27,7 @@ class UpdateReportRequest extends FormRequest
             'latitude' => ['sometimes', 'numeric'],
             'longitude' => ['sometimes', 'numeric'],
             'location_name' => ['sometimes', 'string', 'max:255'],
-            'status' => ['sometimes', Rule::in(['Pending', 'Matched', 'Claimed', 'Returned'])],
+            'status' => ['sometimes', Rule::in(['Pending', 'Matched', 'Claimed'])],
             'image_path' => [
                 'sometimes',
                 Rule::requiredIf(fn () => $this->input('type') === 'Found' && ! $this->hasFile('image_file')),

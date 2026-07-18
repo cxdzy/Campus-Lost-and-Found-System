@@ -23,7 +23,7 @@ class StoreReportRequest extends FormRequest
             'latitude' => ['required', 'numeric'],
             'longitude' => ['required', 'numeric'],
             'location_name' => ['required', 'string', 'max:255'],
-            'status' => ['required', Rule::in(['Pending', 'Matched', 'Claimed', 'Returned'])],
+            'status' => ['required', Rule::in(['Pending', 'Matched', 'Claimed'])],
             'image_path' => [
                 Rule::requiredIf(fn () => $this->input('type') === 'Found' && ! $this->hasFile('image_file')),
                 'nullable',

@@ -359,6 +359,9 @@ MATCH_CONFIDENCE_THRESHOLD=0.80
 GOOGLE_VISION_API_KEY=...        # Google Cloud Vision API key, free tier 1000/month
 STORAGE_PUBLIC_URL=http://your-vps-ip:8000  # public URL for VisionService to build image URLs
                                               # must NOT be localhost — Google needs to fetch the image
+                                              APP_URL=https://campuslostfound.cxdzy.dev
+STORAGE_PUBLIC_URL=https://campuslostfound.cxdzy.dev
+LARAVEL_APP_URL=https://campuslostfound.cxdzy.dev
 ```
 
 ---

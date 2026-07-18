@@ -189,26 +189,27 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 });
 
-// Temporary one-shot route to create the storage symlink inside the deployed container.
-// Visit /symlink-fix once after each fresh deployment, then this route can be removed.
-Route::get('/symlink-fix', function () {
-    \Illuminate\Support\Facades\Artisan::call('storage:link');
-    return 'Storage linked successfully!';
-});
+// Manual post-deploy admin tools — Admin-only, never reachable anonymously.
+Route::middleware(['auth', \App\Http\Middleware\EnsureUserRole::class.':Admin'])->group(function () {
+    // Visit /symlink-fix once after a fresh deployment if the public/storage symlink is missing.
+    Route::get('/symlink-fix', function () {
+        \Illuminate\Support\Facades\Artisan::call('storage:link');
+        return 'Storage linked successfully!';
+    });
 
-// Temporary one-shot route to seed categories into the live database.
-// Visit /seed-categories once after deployment if the dropdown shows only "Others".
-Route::get('/seed-categories', function () {
-    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'CategorySeeder', '--force' => true]);
-    $categories = \App\Models\Category::orderBy('category_name')->pluck('category_name');
-    return 'Categories seeded: ' . $categories->join(', ');
-});
+    // Visit /seed-categories once after deployment if the dropdown shows only "Others".
+    Route::get('/seed-categories', function () {
+        \Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'CategorySeeder', '--force' => true]);
+        $categories = \App\Models\Category::orderBy('category_name')->pluck('category_name');
+        return 'Categories seeded: ' . $categories->join(', ');
+    });
 
-// Temporary: run any pending migrations instantly without a full redeploy.
-Route::get('/run-migrations', function () {
-    Artisan::call('migrate', ['--force' => true]);
-    $output = Artisan::output();
-    return '<pre>' . $output . '</pre>Done.';
+    // Run any pending migrations instantly without a full redeploy.
+    Route::get('/run-migrations', function () {
+        Artisan::call('migrate', ['--force' => true]);
+        $output = Artisan::output();
+        return '<pre>' . $output . '</pre>Done.';
+    });
 });
 
 // ── Docker/Dokploy Symlink Bypass ───────────────────────────────────────────

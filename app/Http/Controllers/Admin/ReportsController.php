@@ -5,9 +5,17 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreReportRequest;
 use App\Http\Requests\Admin\UpdateReportRequest;
+use App\Models\ApiLog;
+use App\Models\Finder;
+use App\Models\FoundItem;
 use App\Models\Item;
+use App\Models\Loser;
+use App\Models\LostItem;
+use App\Models\MatchAlert;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ReportsController extends Controller
@@ -98,28 +106,107 @@ class ReportsController extends Controller
     {
         $data = $request->validated();
 
+        $imagePath = null;
         if ($request->hasFile('image_file')) {
-            $data['image_path'] = $request->file('image_file')->store('lost_placeholders', 'public');
+            $imagePath = $request->file('image_file')->store('lost_placeholders', 'public');
+        } elseif (!empty($data['image_path'])) {
+            $imagePath = $data['image_path'];
         }
 
-        $report = Item::create($data);
-        $report = $report->load('category');
-        $report->image_url = $report->image_path ? Storage::url($report->image_path) : null;
+        $reporter = User::findOrFail($data['user_id']);
 
-        return response()->json(['data' => $report], 201);
+        DB::beginTransaction();
+        try {
+            $item = Item::create([
+                'category_id'       => $data['category_id'],
+                'title_description' => $data['title_description'],
+                'latitude'          => $data['latitude'],
+                'longitude'         => $data['longitude'],
+                'location_name'     => $data['location_name'],
+                'status'            => $data['status'],
+            ]);
+
+            if ($data['type'] === 'Lost') {
+                $loser = Loser::firstOrCreate(
+                    ['user_id' => $reporter->id],
+                    ['matric_number' => $reporter->matric_number ?? ('STUDENT-' . $reporter->id)]
+                );
+
+                LostItem::create([
+                    'item_id'    => $item->id,
+                    'loser_id'   => $loser->user_id,
+                    'image_path' => $imagePath,
+                ]);
+            } else {
+                $finder = Finder::firstOrCreate(['user_id' => $reporter->id]);
+
+                FoundItem::create([
+                    'item_id'    => $item->id,
+                    'finder_id'  => $finder->user_id,
+                    'image_path' => $imagePath,
+                ]);
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to save report: ' . $e->getMessage()], 500);
+        }
+
+        $item->load(['category', 'foundItem', 'lostItem']);
+        $item->image_url = $imagePath ? Storage::url($imagePath) : null;
+
+        return response()->json(['data' => $item], 201);
     }
 
     public function update(UpdateReportRequest $request, Item $report)
     {
         $data = $request->validated();
 
+        $imagePath = null;
         if ($request->hasFile('image_file')) {
-            $data['image_path'] = $request->file('image_file')->store('lost_placeholders', 'public');
+            $imagePath = $request->file('image_file')->store('lost_placeholders', 'public');
+        } elseif (!empty($data['image_path'])) {
+            $imagePath = $data['image_path'];
         }
 
-        $report->update($data);
-        $report = $report->load('category');
-        $report->image_url = $report->image_path ? Storage::url($report->image_path) : null;
+        $itemData = array_intersect_key($data, array_flip([
+            'category_id', 'title_description', 'latitude', 'longitude', 'location_name', 'status',
+        ]));
+
+        DB::beginTransaction();
+        try {
+            $report->fill($itemData)->save();
+
+            // Reassign the reporter (Lost → loser_id, Found → finder_id) if a new user_id was submitted
+            if (!empty($data['user_id'])) {
+                $reporter = User::findOrFail($data['user_id']);
+
+                if ($report->lostItem) {
+                    $loser = Loser::firstOrCreate(
+                        ['user_id' => $reporter->id],
+                        ['matric_number' => $reporter->matric_number ?? ('STUDENT-' . $reporter->id)]
+                    );
+                    $report->lostItem->update(['loser_id' => $loser->user_id]);
+                } elseif ($report->foundItem) {
+                    $finder = Finder::firstOrCreate(['user_id' => $reporter->id]);
+                    $report->foundItem->update(['finder_id' => $finder->user_id]);
+                }
+            }
+
+            if ($imagePath) {
+                $report->lostItem?->update(['image_path' => $imagePath]);
+                $report->foundItem?->update(['image_path' => $imagePath]);
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update report: ' . $e->getMessage()], 500);
+        }
+
+        $report->load(['category', 'foundItem', 'lostItem']);
+        $report->image_url = $imagePath ? Storage::url($imagePath) : null;
 
         return response()->json(['data' => $report]);
     }
@@ -128,7 +215,21 @@ class ReportsController extends Controller
     {
         $this->authorize('delete', $report);
 
-        $report->delete();
+        DB::beginTransaction();
+        try {
+            MatchAlert::where('found_item_id', $report->id)
+                ->orWhere('lost_item_id', $report->id)
+                ->delete();
+            ApiLog::where('item_id', $report->id)->delete();
+            $report->foundItem?->delete();
+            $report->lostItem?->delete();
+            $report->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to delete report: ' . $e->getMessage()], 500);
+        }
+
         return response()->json([], 204);
     }
 }
