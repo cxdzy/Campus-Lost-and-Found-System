@@ -884,9 +884,6 @@ const pageTitle = computed(() => {
                                         <div class="w-32 h-32 rounded-full bg-indigo-100 border-4 border-white shadow-lg flex items-center justify-center overflow-hidden mb-4">
                                             <span class="text-4xl font-bold text-indigo-700">{{ userProfile.name.charAt(0) }}</span>
                                         </div>
-                                        <button class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 transition-colors border border-indigo-100">
-                                            Update Photo
-                                        </button>
                                     </div>
 
                                     <form @submit.prevent="saveSettings" class="flex-1 space-y-6 w-full">
