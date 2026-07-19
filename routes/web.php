@@ -39,6 +39,7 @@ function resolveItemPayload(Item $item): array
         'location_name'     => $item->location_name,
         'image_url'         => $imageUrl,
         'image_path'        => $imageUrl,
+        'status'            => $item->status,
     ];
 }
 

@@ -172,6 +172,7 @@ const mapItemToCard = (item) => {
         title: item.title_description,
         category: categoryName,
         location: (!item.location_name || item.location_name === 'Unknown location') && item.latitude && item.longitude ? `GPS: ${item.latitude}, ${item.longitude}` : (item.location_name || 'Unknown location'),
+        status: item.status ?? 'Pending',
         timeAgo: formatTimeAgo(item.created_at),
         image: item.image_url ? normalizeImagePath(item.image_url) : '/images/placeholder-item.svg',
         lat: item.latitude ?? null,
@@ -561,6 +562,9 @@ const pageTitle = computed(() => {
                                     <img :src="item.image" :alt="item.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='/images/placeholder-item.svg';">
                                     <div class="absolute top-3 right-3 bg-white bg-opacity-90 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-bold text-gray-700 uppercase tracking-wide shadow-sm">
                                         {{ item.category }}
+                                    </div>
+                                    <div :class="['absolute top-3 left-3 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide shadow-sm text-white', item.status === 'Matched' ? 'bg-indigo-600' : item.status === 'Claimed' ? 'bg-gray-500' : 'bg-green-600']">
+                                        {{ item.status === 'Matched' ? 'Matched' : item.status === 'Claimed' ? 'Claimed' : 'Available' }}
                                     </div>
                                 </div>
                                 <div class="p-5">
