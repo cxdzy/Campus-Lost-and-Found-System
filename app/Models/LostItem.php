@@ -14,6 +14,7 @@ class LostItem extends Model
         'item_id',
         'loser_id',
         'image_path',
+        'distinctive_features',
     ];
 
     public function item(): BelongsTo

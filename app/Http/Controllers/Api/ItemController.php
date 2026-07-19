@@ -75,6 +75,7 @@ class ItemController extends Controller
             ],
             'image_path'        => ['nullable', 'string', 'max:500'],
             'status'            => ['nullable', 'string', 'in:Pending,Matched,Claimed'],
+            'features'          => ['nullable', 'string', 'max:1000'],
         ]);
 
         $user = Auth::user();
@@ -116,8 +117,9 @@ class ItemController extends Controller
                 }
 
                 $lostData = [
-                    'item_id'  => $item->id,
-                    'loser_id' => $user->loser->user_id,
+                    'item_id'               => $item->id,
+                    'loser_id'              => $user->loser->user_id,
+                    'distinctive_features'  => $data['features'] ?? null,
                 ];
 
                 // Only include image_path when the column exists in the DB

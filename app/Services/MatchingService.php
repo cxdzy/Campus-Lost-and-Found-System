@@ -39,7 +39,7 @@ class MatchingService
                 continue;
             }
 
-            $score = $this->computeScore($foundTags, $foundItemBase, $lostBase);
+            $score = $this->computeScore($foundTags, $foundItemBase, $lostBase, $lostItem);
 
             if ($score >= (float) config('matching.threshold', 0.80)) {
                 $alert = MatchAlert::create([
@@ -80,7 +80,7 @@ class MatchingService
                              ->map(fn ($t) => strtolower($t))
                              ->toArray();
 
-            $score = $this->computeScore($foundTags, $foundBase, $lostBase);
+            $score = $this->computeScore($foundTags, $foundBase, $lostBase, $lostItem);
 
             if ($score >= (float) config('matching.threshold', 0.80)) {
                 $alert = MatchAlert::create([
@@ -98,9 +98,10 @@ class MatchingService
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
-    private function computeScore(array $foundTags, Item $foundBase, Item $lostBase): float
+    private function computeScore(array $foundTags, Item $foundBase, Item $lostBase, LostItem $lostItem): float
     {
-        $tagScore       = $this->tagOverlapScore($foundTags, $lostBase->title_description);
+        $lostDescription = trim($lostBase->title_description . ' ' . ($lostItem->distinctive_features ?? ''));
+        $tagScore       = $this->tagOverlapScore($foundTags, $lostDescription);
         $proximityScore = $this->proximityScore(
             $foundBase->latitude, $foundBase->longitude,
             $lostBase->latitude,  $lostBase->longitude,
