@@ -21,8 +21,9 @@ class BotSubmissionController extends Controller
 {
     private function authorizeBot(Request $request): ?JsonResponse
     {
-        $secret = config('services.bot.secret');
-        if (!$secret || $request->header('X-Bot-Secret') !== $secret) {
+        $secret = trim((string) config('services.bot.secret'));
+        $header = trim((string) $request->header('X-Bot-Secret'));
+        if (!$secret || $header !== $secret) {
             return response()->json(['message' => 'Unauthorized.'], 401);
         }
         return null;
