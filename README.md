@@ -2,7 +2,7 @@
 
 A Laravel back end that matches Telegram-reported found items against web-reported lost items using Google Cloud Vision tags and GPS proximity, then notifies the owner and issues a one-time claim code.
 
-Live demo: https://campuslostfound.cxdzy.dev
+Live demo: https://campuslostfound.cxdzy.dev (offline for now)
 
 ![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white)
